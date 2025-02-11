@@ -1,0 +1,18 @@
+{
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:135.0) Gecko/20100101 Firefox/135.0",
+    "Accept": "*/*",
+    "Accept-Language": "en-US,en;q=0.5",
+    "Referer": "https://dream.ai/",
+    "x-app-version": "WEB-2.0.0",
+    "Authorization": "bearer eyJhbGciOiJSUzI1NiIsImtpZCI6ImE0MzRmMzFkN2Y3NWRiN2QyZjQ0YjgxZDg1MjMwZWQxN2ZlNTk3MzciLCJ0eXAiOiJKV1QifQ.eyJwcm92aWRlcl9pZCI6ImFub255bW91cyIsImlzcyI6Imh0dHBzOi8vc2VjdXJldG9rZW4uZ29vZ2xlLmNvbS9wYWludC1wcm9kIiwiYXVkIjoicGFpbnQtcHJvZCIsImF1dGhfdGltZSI6MTczODkzMDg1NCwidXNlcl9pZCI6IjY3MXQ2OXpZckxmelhTMkJWcjZQZDhwWmREQzMiLCJzdWIiOiI2NzF0Njl6WXJMZnpYUzJCVnI2UGQ4cFpkREMzIiwiaWF0IjoxNzM4OTM0NTMxLCJleHAiOjE3Mzg5MzgxMzEsImZpcmViYXNlIjp7ImlkZW50aXRpZXMiOnt9LCJzaWduX2luX3Byb3ZpZGVyIjoiYW5vbnltb3VzIn19.ZHGAUJf2vVyQi6tSmWtvWsUfhRc9Z-E4Cu8EV5KwiEVBLo_L5oWd7jncAPWfSutyTbN7s0V8svb_PVSmFoC1OHBqV8x1Bnj8Xk-W0eIz_-7Rm-MdOjNx3ntxGIG4wDueW9PFL-nIjgwx9kv8Z-sNMlZcxPM76wbMdtM0AILAVbEaLAQK_MXdqE5J0v7kMCCqNtehlr0gcxNDOqjbpfa1LlVm9ZY87hWy3IyuSMTzjGqvr_yo1eik_i6f7jolj4KYoACQ2xIXQw-7UhxhkhdobW248jqbLedj8WPWsUUeWe0nHJcGAuCZCwiwLAKIMPm4wRS6ItRAVJL3fLGNiqU5qw",
+    "x-validation-token": "eyJraWQiOiJGX05lUGciLCJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJzdWIiOiIxOjE4MTY4MTU2OTM1OTp3ZWI6Mjc3MTMzYjU3ZmVjZjU3YWYwZjQzYSIsImF1ZCI6WyJwcm9qZWN0c1wvMTgxNjgxNTY5MzU5IiwicHJvamVjdHNcL3BhaW50LXByb2QiXSwicHJvdmlkZXIiOiJyZWNhcHRjaGFfZW50ZXJwcmlzZSIsImlzcyI6Imh0dHBzOlwvXC9maXJlYmFzZWFwcGNoZWNrLmdvb2dsZWFwaXMuY29tXC8xODE2ODE1NjkzNTkiLCJleHAiOjE3Mzg5NDg4NDgsImlhdCI6MTczODkzMDg0OCwianRpIjoiWkxXaE82THFPN1dRLVByOTBQS0xwOFl5MnRjYXRDeWtpZ3AwNmNOelg0SSJ9.Cv6Qj8H8vfIm6pbuseVIFdDr5uEh-tCPmSSSrvCE7fdQ-3qQuR7_Oesh04UQrOE7yD6XIYthlLnVI3meEidsb_J0fRbheELLSyCDY9T1nenrvf5ZtfqqU8-3aLpKvI9G8NYTovG-55Babdx5PgU86xQ8A24si74LvGxmP-Muj59O8GXnL_iPc9BnF2X9LMTHtmGze9R1cJ6j7LzPT4_62aM2AtPHLxjzC7K-3W6mqh79yl_K8qFMDscPoy-Az8sAu_KGpoJ6oAYB23xLLmB1DsmLTTO8NhS8btkqKqbEFq_0iAi4S2auLpt9h5o48_h7vyChN-pm_EKTNQri_Y3Nvwb1D-S0v1rmrzPpdNwG0el833sTZbTaeKp5SxDhtklPV2h7QYZ24hVQh-Bocrk0pdZNw9KwjQ1V4qbBwz8viyG96p_oX3RxD_4E3K2cSBNSNo-Cw-yvj79QMnwNCWP7FNWd0qXpx4GDIHjtIZpKQd0sli82CkQ1WHx8Kiv3-Y6g",
+    "Content-Type": "text/plain;charset=UTF-8",
+    "Origin": "https://dream.ai",
+    "DNT": "1",
+    "Connection": "keep-alive",
+    "Sec-Fetch-Dest": "empty",
+    "Sec-Fetch-Mode": "cors",
+    "Sec-Fetch-Site": "cross-site",
+    "Sec-GPC": "1",
+    "Priority": "u=4"
+}

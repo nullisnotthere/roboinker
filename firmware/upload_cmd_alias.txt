@@ -1,0 +1,7 @@
+arduino-cli compile --fqbn arduino:avr:uno test/ && arduino-cli upload -p /dev/ttyUSB0 --fqbn arduino:avr:uno test/
+
+arduino-cli monitor -p /dev/ttyUSB0 -c baudrate=9600
+
+rm -rf ~/.cache/arduino/ && arduino-cli compile --fqbn arduino:avr:uno motor_test/ && arduino-cli upload -p /dev/ttyUSB0 --fqbn arduino:avr:uno motor_test
+
+
