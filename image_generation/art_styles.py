@@ -1,3 +1,8 @@
+"""
+Contains various integer values stored as an enum corresponding to the
+Dream AI's image generation art styles.
+"""
+
 from enum import Enum
 
 

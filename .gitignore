@@ -1,0 +1,9 @@
+# Ignore sensitive information (Python dotenv)
+.env
+
+# Ignore images
+images/
+
+# Ignore compiled Python files
+__pycache__/
+*.pyc

@@ -1,7 +1,12 @@
 """
+Inverse kinematics mathematics for a 2-DOF robotic arm.
+
+Contains a function to show the graphed visualisation of the arm given
+a desired target point.
+
 Source: https://github.com/vishwas1101/Inverse-Kinematic-Robot-Arm/blob/
         master/InverseKinematics/IK_Simulation.py
-Refactored and debugged via ChatGPT and myself
+Refactored and debugged via ChatGPT and myself.
 """
 
 import math

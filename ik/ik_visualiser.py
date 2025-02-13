@@ -1,10 +1,18 @@
+"""
+Simple visualiser for inverse kinematics mathematics.
+Shows side and top views along with respective bounding arcs for arm maximum
+extensions.
+"""
+
 import math
 import pygame
 from pygame import Vector2
-import ik
+from . import ik
 
 
 def _rotate_line(start, end, angle) -> tuple[Vector2, Vector2]:
+    # Transforms start and end coordinates according to angle of rotation
+
     angle_rad = math.radians(angle)
     x1, y1 = start
     x2, y2 = end
@@ -94,7 +102,9 @@ def draw_arms(x: float,
 
     sv_arc_center = Vector2(base_screen.x, base_screen.y + pen_offset)
     sv_arc_radius = arm1 + arm2
-    pygame.draw.circle(screen, (230, 230, 230), sv_arc_center, sv_arc_radius, 5)
+    pygame.draw.circle(
+        screen, (230, 230, 230), sv_arc_center, sv_arc_radius, 5
+    )
 
     # Draw top
     pygame.draw.line(screen, pygame.Color("red"), tv_a1_start, tv_a1_end, 8)

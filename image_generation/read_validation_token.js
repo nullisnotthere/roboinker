@@ -1,9 +1,7 @@
-let token = "ERROR";
-
-const request = indexedDB.open("firebase-app-check-database");
-
 async function getToken() {
     return new Promise((resolve, reject) => {
+        const request = indexedDB.open("firebase-app-check-database");
+
         request.onsuccess = function(event) {
             const db = event.target.result;
             const transaction = db.transaction("firebase-app-check-store", "readonly");
@@ -13,12 +11,11 @@ async function getToken() {
             getAllRequest.onsuccess = function() {
                 const records = getAllRequest.result;
                 if (records.length > 0 && records[0].value && records[0].value.token) {
-                    token = records[0].value.token;
-                    console.log("Firebase App Check Token:\n", token);
-                    resolve(token); // Resolve the promise with the token
+                    console.log("Firebase App Check Token:\n", records[0].value.token);
+                    resolve(records[0].value.token);
                 } else {
                     console.log("Token not found in IndexedDB.");
-                    resolve(null); // Resolve with null if no token is found
+                    resolve(null);
                 }
             };
 
@@ -35,11 +32,4 @@ async function getToken() {
     });
 }
 
-// Call the function and handle the promise
-getToken().then((token) => {
-    console.log("Token received: ", token);
-}).catch((error) => {
-    console.error("Error occurred:", error);
-});
-
-return getToken();
+return await getToken();
