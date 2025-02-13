@@ -3,6 +3,7 @@
 
 # Ignore images
 images/
+*.png
 
 # Ignore compiled Python files
 __pycache__/
