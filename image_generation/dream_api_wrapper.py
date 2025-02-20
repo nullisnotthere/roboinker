@@ -1,22 +1,21 @@
 #!/usr/bin/env python3
 
 """
-This API Wrapper interacts with Dream by WOMBO to generate images from the web
-and retreive them as PIL Images.
+This API Wrapper interacts with 'Dream by WOMBO' to generate images from the
+web and retreive them as OpenCV images.
 
 Sources:
 https://github.com/krisskad/DreamAI?tab=readme-ov-file
 https://dream.ai/create
 """
 
-from io import BytesIO
-
 import os
 import time
 import json
 import requests
-
-from PIL import Image
+import numpy as np
+import cv2
+from cv2.typing import MatLike
 
 from dotenv import load_dotenv, set_key
 from .art_styles import ArtStyle
@@ -26,7 +25,7 @@ load_dotenv()
 
 MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-HEADERS_FILE = os.path.join(MODULE_DIR, "headers.json")  # headers template
+HEADERS_FILE = os.path.join(MODULE_DIR, "headers.json")  # Headers template
 DOT_ENV_PATH = os.path.join(MODULE_DIR, ".env")
 
 DREAM_LOGIN_URL = "https://dream.ai/profile"
@@ -96,7 +95,7 @@ def _get_new_auth_token() -> str | None:
 
 
 def _load_headers() -> dict[str, str]:
-    # Retreive the headers from headers.json and fill with in the sensitive
+    # Retreive the headers from headers.json and fill in the sensitive
     # auth data stored in .env
     # Raises a ValueError if .env environment variables can not be found
 
@@ -110,7 +109,7 @@ def _load_headers() -> dict[str, str]:
     except FileNotFoundError:
         print(f"Could not open headers file: {HEADERS_FILE}")
 
-    # Update with sensitive auth data
+    # Update with sensitive auth data from .env
     auth_token = os.getenv("AUTHORIZATION_TOKEN")
 
     if not auth_token:
@@ -123,7 +122,8 @@ def _load_headers() -> dict[str, str]:
 def _check_task_status(task_id: str, timeout: float) -> dict | None:
     # Checks if the current request is complete
     # This is used when generating the image. We do not know how long it will
-    # take so we must have a way to ensure the status of the request.
+    # take to finish generation, so we must have a way to ensure the status
+    # of the request.
 
     headers = _load_headers()
 
@@ -221,7 +221,7 @@ def _poll_for_img_url(task_id: str, retries: int = 3) -> str | None:
 
 
 def generate_image(prompt: str, style_id: ArtStyle, retries: int = 3
-                   ) -> Image.Image | None:
+                   ) -> MatLike | None:
     """Returns a PIL Image based on a given prompt via Dream AI."""
 
     data = {
@@ -259,11 +259,11 @@ def generate_image(prompt: str, style_id: ArtStyle, retries: int = 3
         print(f"Failed to download image: {req_err}")
         return None
 
-    # Try to open the image and return PIL Image
+    # Try to open the image and return OpenCV image
     try:
-        pil_image = Image.open(BytesIO(response.content))
-
-        return pil_image
+        image_bytes = np.frombuffer(response.content, np.uint8)
+        cv_image = cv2.imdecode(image_bytes, cv2.IMREAD_COLOR)
+        return cv_image
     except (IOError, ValueError) as img_err:
         print(f"Failed to open image: {img_err}")
         return None

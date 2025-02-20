@@ -10,6 +10,7 @@ robotic arm movement.
 import time
 import numpy as np
 import pygame
+import cv2
 from ik import ik_visualiser
 
 from image_processing import image_processing as im_proc
@@ -46,24 +47,22 @@ def main() -> None:
     print(f"{prompt=}")
 
     img = generate_image(prompt, ArtStyle.DREAMLAND_V3)
-    img.show()
-    opencv_image = np.array(img)
+    if img is not None:
+        cv2.imshow("Image", img)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
 
     # TODO: handle nsfw rejection
     # TODO: retry with higher detail if contour count less than min number
 
     print('Getting contours...')
-
-    contours = im_proc.extract_contours(
-        opencv_image,
-        arm_max_length=ARM1 + ARM2,
-    )
+    contours = im_proc.extract_contours(img, arm_max_length=ARM1 + ARM2)
 
     print('Sorting contours')
     contours = im_proc.sort_contours(contours)
 
     print("Getting optimal dimensions")
-    img_w, _ = im_proc.get_image_new_dimen(opencv_image, ARM1 + ARM2)
+    img_w, _ = im_proc.get_image_new_dimen(img, ARM1 + ARM2)
 
     print('Saving motor angles')
     im_proc.save_motor_angles(

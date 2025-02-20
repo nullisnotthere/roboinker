@@ -8,8 +8,6 @@ import cv2
 import numpy as np
 from scipy.interpolate import splprep, splev
 from scipy.spatial import distance
-from skimage.measure import find_contours  # pylint: disable=E0611
-
 from ik import ik
 
 
@@ -22,7 +20,7 @@ LINSCAPE_THRESH_WIDE = (0.0, 1.0)
 LINSCAPE_THRESH_NARROW = (0.05, 0.95)
 
 # First tuple value is to be used for low detail, second is for high detail
-MIN_CONT_PTS_IGNORE_RANGE = (2, 5)
+MIN_CONT_PTS_IGNORE_RANGE = (2, 12)
 MIN_CONT_PTS_SMOOTH_RANGE = (70, 30)
 EPSILON_RANGE = (0.05, 0.5)
 SMOOTHNESS_RANGE = (10, 90)
