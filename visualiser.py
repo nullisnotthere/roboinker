@@ -7,20 +7,19 @@ Demonstrates prompt to image, image processing, inverse kinematics, and
 robotic arm movement.
 """
 
-import random
-import cv2
+import time
 import numpy as np
 import pygame
 from ik import ik_visualiser
 
+from image_processing import image_processing as im_proc
 from prompt_processing import filter_prompt
-from image_processing import get_contours
 from image_generation.dream_api_wrapper import generate_image
 from image_generation.art_styles import ArtStyle
 
 
 WIDTH, HEIGHT = 1000, 700
-FPS = 300
+FPS = 3000
 BG_COLOUR = pygame.Color("White")
 
 BASE = 65
@@ -31,6 +30,8 @@ PEN_OFFSET = 30
 # pylint: disable=too-many-locals
 def main() -> None:
     """Main function"""
+    start_time = time.time()
+
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("Robotic Arm Visualizer")
@@ -44,77 +45,115 @@ def main() -> None:
     prompt = filter_prompt(input("Enter prompt: "))
     print(f"{prompt=}")
 
-    img = generate_image(prompt, ArtStyle.COMIC_V3)
+    img = generate_image(prompt, ArtStyle.DREAMLAND_V3)
     img.show()
+    opencv_image = np.array(img)
 
-    if img is None:
-        raise RuntimeError("Failed to retreive image.")
+    # TODO: handle nsfw rejection
+    # TODO: retry with higher detail if contour count less than min number
 
-    contours = get_contours(img, arm_max_length=ARM1 + ARM2)
+    print('Getting contours...')
 
-    # pylint: disable=pointless-string-statement
-    '''
-    white_bg = np.ones_like(img) * 255
-    cv2.drawContours(white_bg, contours, -1, (0, 0, 0), 1)
-    cv2.imshow("Contours only", white_bg)
+    contours = im_proc.extract_contours(
+        opencv_image,
+        arm_max_length=ARM1 + ARM2,
+    )
 
-    while True:
-        key = cv2.waitKey(0)
-        if key == ord('q'):
-            cv2.destroyAllWindows()
-            break
-    '''
+    print('Sorting contours')
+    contours = im_proc.sort_contours(contours)
+
+    print("Getting optimal dimensions")
+    img_w, _ = im_proc.get_image_new_dimen(opencv_image, ARM1 + ARM2)
+
+    print('Saving motor angles')
+    im_proc.save_motor_angles(
+        contours,
+        BASE, ARM1, ARM2,
+        offset=(0, -img_w, PEN_OFFSET + BASE),
+        output_file="output.angles"
+    )
 
     print("Drawing...")
 
     prev_point = ()
-    for contour in contours:
-        cnt_colour = tuple(random.randint(0, 100) for _ in range(3))
-        for point_index, point in enumerate(contour):
+    screen.fill(BG_COLOUR)
+
+    is_pen_down = False
+
+    with open("output.angles", "r", encoding="utf-8") as f:
+        for line in f.readlines():
             if not running:
                 break
 
-            screen.fill(BG_COLOUR)
+            line = line.strip()
+
+            has_params = ":" in line
+            cmd = line.split(":")[0] if has_params else line
+            params = line.split(":")[1].split(",") if has_params else None
+
+            angles = None
+            match cmd:
+                case "NO ANGLES":
+                    continue
+                case "ANGLES" if params:
+                    angles = tuple(map(float, params))
+                case "PEN UP":
+                    is_pen_down = False
+                case "PEN DOWN":
+                    is_pen_down = True
+                case _:
+                    print(f"Unknown command: '{cmd}'. Skipping.")
+                    continue
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
                     break
 
-            if not isinstance(point, np.ndarray):
-                raise ValueError("Point must be of type np.ndarray.")
+            # Validate angles
+            if angles is None:
+                continue
+            if not isinstance(angles, tuple):
+                continue
+            if not all(isinstance(a, float) for a in angles):
+                continue
+            if len(angles) != 3:
+                continue
 
-            # DRAW POINT
-            screen_x, screen_y = point[0] + (WIDTH // 2, HEIGHT - BASE)
-            target_x, target_y = -screen_y + HEIGHT, screen_x - WIDTH // 2
+            pen_point = ik_visualiser.draw_arms(
+                angles, BASE, ARM1, ARM2, PEN_OFFSET, screen
+            )
 
-            if prev_point and point_index > 0:
+            # Draw straight line between points
+            if prev_point and is_pen_down:
                 pygame.draw.line(
                     points_surface,
-                    cnt_colour,
-                    (prev_point),
-                    (screen_x, screen_y),
-                    1
+                    (100, 100, 100),
+                    prev_point,
+                    pen_point if pen_point else (0, 0),
+                    2
                 )
 
             screen.blit(points_surface, (0, 0))
-            prev_point = (screen_x, screen_y)
+            prev_point = pen_point
 
             ik_visualiser.draw_arms(
-                target_x, target_y, 0,  # x, y, z
-                BASE, ARM1, ARM2, PEN_OFFSET,
-                screen
+                angles, BASE, ARM1, ARM2, PEN_OFFSET, screen
             )
 
             pygame.display.flip()
             clock.tick(FPS)
 
-    print("DONE!")
+    end_time = time.time()
+    print(f"Done. Took {end_time - start_time} seconds.")
 
     while running:
+        screen.fill(BG_COLOUR)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+        screen.blit(points_surface, (0, 0))
+        pygame.display.flip()
 
     pygame.quit()
 

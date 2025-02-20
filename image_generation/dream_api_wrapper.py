@@ -18,12 +18,6 @@ import requests
 
 from PIL import Image
 
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.firefox.options import Options
-from selenium.webdriver.firefox.service import Service
-from webdriver_manager.firefox import GeckoDriverManager
-
 from dotenv import load_dotenv, set_key
 from .art_styles import ArtStyle
 
@@ -34,7 +28,6 @@ MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 HEADERS_FILE = os.path.join(MODULE_DIR, "headers.json")  # headers template
 DOT_ENV_PATH = os.path.join(MODULE_DIR, ".env")
-READ_VTOKEN_SCRIPT = os.path.join(MODULE_DIR, "read_validation_token.js")
 
 DREAM_LOGIN_URL = "https://dream.ai/profile"
 SIGN_IN_URL = "https://identitytoolkit.googleapis.com/v1/"
@@ -102,88 +95,6 @@ def _get_new_auth_token() -> str | None:
     return None
 
 
-def _get_new_validation_token(tries=3) -> str | None:
-    # Get the validation token via dream.ai with selenium webdriver
-    # and read_validation_token.js script injection into console
-    # NOTE: The validation token can NOT be accessed via web requests.
-
-    # Set up the driver
-    firefox_options = Options()
-    firefox_options.headless = True  # Set headless mode
-    firefox_options.add_argument('--disable-extensions')
-    firefox_options.add_argument('--disable-gpu')
-    firefox_options.add_argument('--no-sandbox')
-    firefox_options.add_argument('--headless')
-    firefox_options.add_argument(USER_AGENT)
-
-    # Setup the path to the GeckoDriver
-    service = Service(GeckoDriverManager().install())
-    driver = webdriver.Firefox(service=service, options=firefox_options)
-
-    # Wrapped in try...finally to ensure the driver is closed if program
-    # reaches an exception
-    try:
-        print('Launching webdriver...')
-
-        # Navigate to the login page
-        driver.get(DREAM_LOGIN_URL)
-
-        # Fill in the login credentials
-        email = os.getenv("EMAIL")
-        password = os.getenv("PASSWORD")
-
-        if not (email and password):
-            raise ValueError(
-                "Failed to retrieve email and password from dotenv."
-            )
-
-        # Enter email and password, then click login button
-        email_input = driver.find_element(By.XPATH, EMAIL_INPUT_XPATH)
-        email_input.send_keys(email)
-        time.sleep(1)
-
-        password_input = driver.find_element(By.XPATH, PASSWORD_INPUT_XPATH)
-        password_input.send_keys(password)
-        time.sleep(1)
-
-        button = driver.find_element(By.XPATH, LOGIN_BTN_XPATH)
-        button.click()
-        time.sleep(6)
-        driver.save_screenshot("login.png")
-
-        # Retry if the code fails to retrieve the token
-        for t in range(1, tries + 1):
-            time.sleep(6)  # Delay to allow page to load
-
-            driver.save_screenshot(f"ss_{t}.png")
-
-            # Execute JavaScript code to fetch the validation token
-            with open(READ_VTOKEN_SCRIPT, "r", encoding="utf-8") as script:
-                new_validation_token = driver.execute_script(script.read())
-                print(new_validation_token)
-
-                if new_validation_token:
-                    break
-
-                if t < tries:
-                    print("Failed to read token. Retrying...")
-                else:
-                    raise RuntimeError(
-                        "Failed to retrieve validation token "
-                        f"after {tries} tries."
-                    )
-
-        # Print the token for debugging and store the token in .env
-        print("\nNew validation token:", new_validation_token)
-        os.environ["VALIDATION_TOKEN"] = new_validation_token
-        set_key(DOT_ENV_PATH, "VALIDATION_TOKEN", new_validation_token)
-
-    finally:
-        driver.quit()
-
-    return new_validation_token
-
-
 def _load_headers() -> dict[str, str]:
     # Retreive the headers from headers.json and fill with in the sensitive
     # auth data stored in .env
@@ -201,17 +112,11 @@ def _load_headers() -> dict[str, str]:
 
     # Update with sensitive auth data
     auth_token = os.getenv("AUTHORIZATION_TOKEN")
-    #validation_token = os.getenv("VALIDATION_TOKEN")
 
-    if not auth_token: #or not validation_token:
+    if not auth_token:
         raise ValueError("Missing required environment variables.")
 
-    headers.update(
-        {
-            "Authorization": "bearer " + auth_token,
-            #"x-validation-token": validation_token
-        }
-    )
+    headers.update({"Authorization": "bearer " + auth_token})
     return headers
 
 
@@ -266,11 +171,10 @@ def _poll_for_gen_rq_task_id(data: dict) -> str | None:
         print("Task ID missing in response.\n", gen_response.json())
 
         if task_detail in ("Invalid token", "Token expired"):
-            print("Invalid or expired tokens detected. Updating...")
+            print("Invalid or expired token detected. Updating...")
 
-            # Refresh and store new tokens
+            # Refresh and store new token
             _get_new_auth_token()
-            #_get_new_validation_token()
 
             continue
 
@@ -358,6 +262,7 @@ def generate_image(prompt: str, style_id: ArtStyle, retries: int = 3
     # Try to open the image and return PIL Image
     try:
         pil_image = Image.open(BytesIO(response.content))
+
         return pil_image
     except (IOError, ValueError) as img_err:
         print(f"Failed to open image: {img_err}")

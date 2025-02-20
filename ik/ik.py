@@ -6,7 +6,7 @@ a desired target point.
 
 Source: https://github.com/vishwas1101/Inverse-Kinematic-Robot-Arm/blob/
         master/InverseKinematics/IK_Simulation.py
-Refactored and debugged via ChatGPT and myself.
+Refactored and debugged via ChatGPT and https://github.com/nullisnotthere/
 """
 
 import math
@@ -18,22 +18,22 @@ def get_point(x, y, z, base, arm1, arm2, alpha):
     """Calculate the intermediate joint position of the robotic arm."""
     e = (x**2 + y**2 + z**2 - base**2 + arm1**2 - arm2**2) / 2
 
-    if x != 0 or y != 0:
-        tan_alpha = math.tan(math.radians(alpha))
-        denom = (x + y * tan_alpha) ** 2
-        a1 = (((z - base) ** 2) * (1 + tan_alpha ** 2)) / denom + 1
-        b1 = 2 * ((e * (z - base) * (1 + tan_alpha ** 2)) / denom + base)
-        c1 = (e ** 2) * (1 + tan_alpha ** 2) / denom + base ** 2 - arm1 ** 2
+    if x == 0 and y == 0:
+        return 0, 0, base  # Default values for edge case
 
-        discriminant = b1 ** 2 - 4 * a1 * c1
-        if discriminant < 0:
-            return None  # No real solution
+    tan_alpha = math.tan(math.radians(alpha))
+    denom = (x + y * tan_alpha) ** 2
+    a1 = (((z - base) ** 2) * (1 + tan_alpha ** 2)) / denom + 1
+    b1 = 2 * ((e * (z - base) * (1 + tan_alpha ** 2)) / denom + base)
+    c1 = (e ** 2) * (1 + tan_alpha ** 2) / denom + base ** 2 - arm1 ** 2
 
-        c = (b1 + math.sqrt(discriminant)) / (2 * a1)
-        a = (e - c * (z - base)) / (x + y * tan_alpha)
-        b = a * tan_alpha
-    else:
-        a, b, c = 0, 0, base  # Default values for edge cases
+    discriminant = b1 ** 2 - 4 * a1 * c1
+    if discriminant < 0:
+        return None  # No real solution
+
+    c = (b1 + math.sqrt(discriminant)) / (2 * a1)
+    a = (e - c * (z - base)) / (x + y * tan_alpha)
+    b = a * tan_alpha
 
     return a, b, c
 

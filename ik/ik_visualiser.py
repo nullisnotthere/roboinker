@@ -7,7 +7,6 @@ extensions.
 import math
 import pygame
 from pygame import Vector2
-from . import ik
 
 
 def _rotate_line(start, end, angle) -> tuple[Vector2, Vector2]:
@@ -29,25 +28,19 @@ def _rotate_line(start, end, angle) -> tuple[Vector2, Vector2]:
 
 
 # pylint: disable=too-many-locals
-def draw_arms(x: float,
-              y: float,
-              z: float,
+def draw_arms(angles: tuple[float, float, float] | None,
               base: float,
               arm1: float,
               arm2: float,
               pen_offset: float,
-              screen: pygame.Surface
-              ) -> tuple[float, float, float, float] | None:
-    """ Draw the arm to the screen given the desired point """
-    sv_angles = ik.get_angles(x - base, y, z - pen_offset, -base, arm1, arm2)
-    tv_angles = sv_angles
+              screen: pygame.Surface) -> Vector2 | None:
+    """Draw the arm to the screen given the desired point"""
 
-    if not (sv_angles and tv_angles):
-        print(f"NO ANGLES! {sv_angles=}, {tv_angles=}, target=({x, y, z})")
+    if not angles:
+        print(f"NO ANGLES TO DRAW! {angles=}")
         return None
 
-    _, ang_arm1, ang_arm2 = sv_angles
-    ang_base, _, _ = tv_angles
+    ang_base, ang_arm1, ang_arm2 = angles
     ang_base = 90 - ang_base
 
     base_screen = Vector2(screen.get_width() // 2, screen.get_height() - base)
@@ -114,4 +107,4 @@ def draw_arms(x: float,
     tv_arc_radius = arm1 + arm2
     pygame.draw.circle(screen, (200, 200, 200), base_screen, tv_arc_radius, 5)
 
-    return ang_arm1, ang_arm2, ang_base, ang_pen
+    return a2_tv_end  # Return the pen tip's end position
