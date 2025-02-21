@@ -9,14 +9,17 @@ https://github.com/krisskad/DreamAI?tab=readme-ov-file
 https://dream.ai/create
 """
 
+from dataclasses import dataclass
+from enum import Enum
+
 import os
 import time
 import json
 import requests
+from requests.exceptions import ConnectionError, ReadTimeout
 import numpy as np
 import cv2
 from cv2.typing import MatLike
-
 from dotenv import load_dotenv, set_key
 from .art_styles import ArtStyle
 
@@ -32,21 +35,23 @@ DREAM_LOGIN_URL = "https://dream.ai/profile"
 SIGN_IN_URL = "https://identitytoolkit.googleapis.com/v1/"
 GENERATE_IMAGE_URL = "https://paint.api.wombo.ai/api/v2/tasks"
 
-USER_AGENT = (
-    "user-agent=Mozilla/5.0 (X11; Linux x86_64; rv:135.0) "
-    "Gecko/20100101 Firefox/135.0"
-)
 
-# Email, password, login button element XPaths
-EMAIL_INPUT_XPATH = (
-    "/html/body/div[1]/div/div[3]/div/div/div[2]/div/div[1]/div[1]/input"
-)
-PASSWORD_INPUT_XPATH = (
-    "/html/body/div[1]/div/div[3]/div/div/div[2]/div/div[1]/div[2]/input"
-)
-LOGIN_BTN_XPATH = (
-    "/html/body/div[1]/div/div[3]/div/div/div[2]/div/div[2]/div[2]/button"
-)
+class ResponseStatus(Enum):
+    """Enum to declare different response statuses. One of these
+    will be included in the final image response."""
+    FAILURE = 0
+    SUCCESS = 1
+    NSFW = 2
+
+
+@dataclass
+class ImageResponse:
+    """Dataclass to encapsulate the image returned by the response
+    and the response status and message from the generation. This
+    will be returned after the request and generation processes."""
+    cv_image: MatLike | None
+    status: ResponseStatus
+    message: str
 
 
 def _get_new_auth_token() -> str | None:
@@ -139,21 +144,29 @@ def _check_task_status(task_id: str, timeout: float) -> dict | None:
     return None  # Response failed
 
 
-def _poll_for_gen_rq_task_id(data: dict) -> str | None:
+def _poll_for_gen_rq_task_id(data: dict, retries: int = 3) -> str | None:
     # Poll for successful generation request
     # If successful, return the task ID, otherwise return None
 
-    while True:
+    for _ in range(retries):
         print("Posting response...")
         headers = _load_headers()
 
-        gen_response = requests.post(
-            GENERATE_IMAGE_URL,
-            headers=headers,
-            data=json.dumps(data),
-            timeout=60,
-        )
-        time.sleep(5)
+        try:
+            gen_response = requests.post(
+                GENERATE_IMAGE_URL,
+                headers=headers,
+                data=json.dumps(data),
+                timeout=30,
+            )
+            time.sleep(5)
+        except (ConnectionError, ReadTimeout) as req_err:
+            # Returns None on failure to connect or request time out
+            print(
+                f"Generation response failed at '{GENERATE_IMAGE_URL}'\n"
+                f"{req_err}"
+            )
+            return None
 
         # Extract task ID and detail from the response
         task_id = gen_response.json().get("id")
@@ -221,7 +234,7 @@ def _poll_for_img_url(task_id: str, retries: int = 3) -> str | None:
 
 
 def generate_image(prompt: str, style_id: ArtStyle, retries: int = 3
-                   ) -> MatLike | None:
+                   ) -> ImageResponse:
     """Returns a PIL Image based on a given prompt via Dream AI."""
 
     data = {
@@ -239,7 +252,17 @@ def generate_image(prompt: str, style_id: ArtStyle, retries: int = 3
     )
 
     if gen_request_id is None:
-        return None
+        return ImageResponse(
+            None,
+            ResponseStatus.FAILURE,
+            "Could not retreive generation request task ID. Null ID."
+        )
+    if gen_request_id == "00000000-0000-0000-0000-000000000000":
+        return ImageResponse(
+            None,
+            ResponseStatus.NSFW,
+            "Could not generate possibly NSFW content."
+        )
 
     image_url = _poll_for_img_url(
         gen_request_id,
@@ -247,23 +270,37 @@ def generate_image(prompt: str, style_id: ArtStyle, retries: int = 3
     )
 
     if image_url is None:
-        print(f"Failed to retreive image after {retries} tries.")
-        return None
+        return ImageResponse(
+            None,
+            ResponseStatus.FAILURE,
+            f"Failed to retreive image after {retries} tries."
+        )
 
-    # Try to download image from 'final' URL
+    # Try to download image from final URL
     try:
         print(f"Getting image at url {image_url}")
         response = requests.get(image_url, timeout=60)
         response.raise_for_status()  # Raise an HTTPError for bad responses
     except requests.exceptions.RequestException as req_err:
-        print(f"Failed to download image: {req_err}")
-        return None
+        return ImageResponse(
+            None,
+            ResponseStatus.FAILURE,
+            f"Failed to download image: {req_err}"
+        )
 
     # Try to open the image and return OpenCV image
     try:
         image_bytes = np.frombuffer(response.content, np.uint8)
         cv_image = cv2.imdecode(image_bytes, cv2.IMREAD_COLOR)
-        return cv_image
+        return ImageResponse(
+            cv_image,
+            ResponseStatus.SUCCESS,
+            "Successfully retreived image data."
+        )
     except (IOError, ValueError) as img_err:
         print(f"Failed to open image: {img_err}")
-        return None
+        return ImageResponse(
+            None,
+            ResponseStatus.FAILURE,
+            f"Failed to convert response content to OpenCV image. {img_err}"
+        )

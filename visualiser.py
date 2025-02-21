@@ -15,7 +15,7 @@ from ik import ik_visualiser
 
 from image_processing import image_processing as im_proc
 from image_generation.prompt_processing import filter_prompt
-from image_generation.dream_api_wrapper import generate_image
+from image_generation.dream_api_wrapper import generate_image, ImageResponse
 from image_generation.art_styles import ArtStyle
 
 
@@ -37,13 +37,21 @@ def gen_image_and_save_angles():
     prompt = filter_prompt(input("Enter prompt: "))
     print(f"{prompt=}")
 
-    img = generate_image(prompt, ArtStyle.DREAMLAND_V3)
-    if img is not None:
-        cv2.imshow("Image", img)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+    img_response: ImageResponse = generate_image(prompt, ArtStyle.DREAMLAND_V3)
+    print(
+        f"Image generation "
+        f"{"failed" if img_response.cv_image is None else "completed"}\n"
+        f"Status: {img_response.status.name}\n"
+        f"Message: {img_response.message}"
+    )
+    if img_response.cv_image is None:
+        return
 
-    # TODO: handle nsfw rejection
+    img = img_response.cv_image
+    cv2.imshow("Image from Dream AI", img)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
     # TODO: retry with higher detail if contour count less than min number
     # TODO: handle `requests.exceptions.ReadTimeout: HTTPSConnectionPool(
     #       host='paint.api.wombo.ai', port=443): Read timed out.
@@ -167,7 +175,8 @@ def main() -> None:
     draw_from_file(screen, points_surface, ANGLES_FILE)
     end_time = time.time()
 
-    print(f"Done. Took {end_time - start_time} seconds.")
+    elapsed_time = end_time - start_time
+    print(f"Done. Took {elapsed_time:.2f} seconds.")
 
     # Show image until user quits
     while running:
