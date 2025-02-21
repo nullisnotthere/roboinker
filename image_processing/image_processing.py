@@ -28,7 +28,9 @@ SMOOTHNESS_RANGE = (10, 90)
 
 def get_image_new_dimen(cv_img, arm_max_length) -> tuple[int, int]:
     """Returns the new width and height for an image given an arm maximum
-    extension."""
+    extension. This is the optimal image area within the arm's semicirclular
+    arc while maintaining the image's aspect ratio. The aspect ratio is
+    fixed by the Dream AI free plan, so we must compromise."""
     img_h, img_w = cv_img.shape[:2]  # Height first, then width
     new_w, new_h = map(int, _max_rect_from_semi(img_w, img_h, arm_max_length))
     return new_w, new_h
