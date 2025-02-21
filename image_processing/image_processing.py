@@ -297,6 +297,9 @@ def _get_smoothed_contours(
 
         # Simplify the contour using RDP
         simplified_contour = _rdp(contour, epsilon=epsilon)
+
+        # Smoothing exponent is either 1 or 3. Linear for straighter contours,
+        # cubic for curvier contours.
         smooth_pwr = _calculate_smooth_pwr(contour)
 
         # Apply B-spline for smoothing if the contour has enough points
