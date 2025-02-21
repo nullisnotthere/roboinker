@@ -33,7 +33,8 @@ def draw_arms(angles: tuple[float, float, float] | None,
               arm1: float,
               arm2: float,
               pen_offset: float,
-              screen: pygame.Surface) -> Vector2 | None:
+              screen: pygame.Surface,
+              return_only: bool = False) -> Vector2 | None:
     """Draw the arm to the screen given the desired point"""
 
     if not angles:
@@ -44,16 +45,6 @@ def draw_arms(angles: tuple[float, float, float] | None,
     ang_base = 90 - ang_base
 
     base_screen = Vector2(screen.get_width() // 2, screen.get_height() - base)
-
-    # Draw ground line
-    ground_y = screen.get_height() - base
-    pygame.draw.line(
-        screen,
-        pygame.Color(20, 20, 20),
-        (0, ground_y),                      # start
-        (screen.get_width(), ground_y),     # end
-        5
-    )
 
     # First arm (side view)
     ang1 = -ang_arm1
@@ -81,6 +72,9 @@ def draw_arms(angles: tuple[float, float, float] | None,
     a2_tv_end = Vector2(tv_a1_end.x + a2_tv_len, tv_a1_end.y)
     a2_tv_start, a2_tv_end = _rotate_line(a2_tv_start, a2_tv_end, -ang_base)
 
+    if return_only:
+        return a2_tv_end  # Return the pen tip's end position
+
     # Pen
     pen_start = a2_end
     pen_end = Vector2(a2_end.x + pen_offset, a2_end.y)
@@ -106,5 +100,15 @@ def draw_arms(angles: tuple[float, float, float] | None,
 
     tv_arc_radius = arm1 + arm2
     pygame.draw.circle(screen, (200, 200, 200), base_screen, tv_arc_radius, 5)
+
+    # Draw ground line
+    ground_y = screen.get_height() - base
+    pygame.draw.line(
+        screen,
+        pygame.Color(20, 20, 20),
+        (0, ground_y),                      # start
+        (screen.get_width(), ground_y),     # end
+        5
+    )
 
     return a2_tv_end  # Return the pen tip's end position

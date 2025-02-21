@@ -190,7 +190,7 @@ def _poll_for_img_url(task_id: str, retries: int = 3) -> str | None:
     # If successful return the image 'final' URL otherwise None
 
     for _ in range(retries):
-        task_status = _check_task_status(task_id, timeout=20)
+        task_status = _check_task_status(task_id, timeout=30)
 
         if state := task_status.get("state") is None:
             print("Failed to check task status.")

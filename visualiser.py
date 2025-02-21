@@ -7,14 +7,14 @@ Demonstrates prompt to image, image processing, inverse kinematics, and
 robotic arm movement.
 """
 
+import os
 import time
-import numpy as np
 import pygame
 import cv2
 from ik import ik_visualiser
 
 from image_processing import image_processing as im_proc
-from prompt_processing import filter_prompt
+from image_generation.prompt_processing import filter_prompt
 from image_generation.dream_api_wrapper import generate_image
 from image_generation.art_styles import ArtStyle
 
@@ -22,26 +22,17 @@ from image_generation.art_styles import ArtStyle
 WIDTH, HEIGHT = 1000, 700
 FPS = 3000
 BG_COLOUR = pygame.Color("White")
+DIR = os.path.dirname(os.path.abspath(__file__))
+ANGLES_FILE = os.path.join(DIR, "output.angles")
 
 BASE = 65
 ARM1 = ARM2 = 250
 PEN_OFFSET = 30
 
 
-# pylint: disable=too-many-locals
-def main() -> None:
-    """Main function"""
-    start_time = time.time()
-
-    pygame.init()
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
-    pygame.display.set_caption("Robotic Arm Visualizer")
-
-    points_surface = pygame.Surface(screen.get_size())
-    points_surface.fill(BG_COLOUR)
-
-    clock = pygame.time.Clock()
-    running = True
+def gen_image_and_save_angles():
+    """Prompt user for input, get the image based on the prompt, process
+    the image, and save the motor angles to the ouput angles file."""
 
     prompt = filter_prompt(input("Enter prompt: "))
     print(f"{prompt=}")
@@ -54,6 +45,9 @@ def main() -> None:
 
     # TODO: handle nsfw rejection
     # TODO: retry with higher detail if contour count less than min number
+    # TODO: handle `requests.exceptions.ReadTimeout: HTTPSConnectionPool(
+    #       host='paint.api.wombo.ai', port=443): Read timed out.
+    #       (read timeout=20)`
 
     print('Getting contours...')
     contours = im_proc.extract_contours(img, arm_max_length=ARM1 + ARM2)
@@ -72,25 +66,36 @@ def main() -> None:
         output_file="output.angles"
     )
 
+
+def draw_from_file(
+        screen: pygame.Surface,
+        points_surface: pygame.Surface,
+        file_path: str):
+    """Draws a visualisation of the robotic arm's movement and draw path
+    based on the angles defined in the angles file."""
+
     print("Drawing...")
-
+    clock = pygame.time.Clock()
+    is_pen_down: bool = False
+    drawing: bool = True
     prev_point = ()
+
+    # Clear background
     screen.fill(BG_COLOUR)
+    points_surface.fill(BG_COLOUR)
 
-    is_pen_down = False
-
-    with open("output.angles", "r", encoding="utf-8") as f:
+    with open(file_path, "r", encoding="utf-8") as f:
         for line in f.readlines():
-            if not running:
+            if not drawing:
                 break
 
             line = line.strip()
-
             has_params = ":" in line
             cmd = line.split(":")[0] if has_params else line
             params = line.split(":")[1].split(",") if has_params else None
-
             angles = None
+
+            # Parse the output angles file
             match cmd:
                 case "NO ANGLES":
                     continue
@@ -104,12 +109,13 @@ def main() -> None:
                     print(f"Unknown command: '{cmd}'. Skipping.")
                     continue
 
+            # Handle pygame events
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    running = False
+                    drawing = False
                     break
 
-            # Validate angles
+            # Validate angles, must be tuple of 3 floats
             if angles is None:
                 continue
             if not isinstance(angles, tuple):
@@ -119,8 +125,9 @@ def main() -> None:
             if len(angles) != 3:
                 continue
 
+            # Store the pen tip position without drawing the arms
             pen_point = ik_visualiser.draw_arms(
-                angles, BASE, ARM1, ARM2, PEN_OFFSET, screen
+                angles, BASE, ARM1, ARM2, PEN_OFFSET, screen, return_only=True
             )
 
             # Draw straight line between points
@@ -136,6 +143,7 @@ def main() -> None:
             screen.blit(points_surface, (0, 0))
             prev_point = pen_point
 
+            # Draw the arm configuration (top and side view)
             ik_visualiser.draw_arms(
                 angles, BASE, ARM1, ARM2, PEN_OFFSET, screen
             )
@@ -143,9 +151,24 @@ def main() -> None:
             pygame.display.flip()
             clock.tick(FPS)
 
+
+def main() -> None:
+    """Main function."""
+    pygame.init()
+    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    pygame.display.set_caption("Robotic Arm Visualizer")
+
+    points_surface = pygame.Surface(screen.get_size())
+    running = True
+
+    start_time = time.time()
+    gen_image_and_save_angles()
+    draw_from_file(screen, points_surface, ANGLES_FILE)
     end_time = time.time()
+
     print(f"Done. Took {end_time - start_time} seconds.")
 
+    # Show image until user quits
     while running:
         screen.fill(BG_COLOUR)
         for event in pygame.event.get():
