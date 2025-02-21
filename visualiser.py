@@ -161,8 +161,9 @@ def main() -> None:
     points_surface = pygame.Surface(screen.get_size())
     running = True
 
-    start_time = time.time()
     gen_image_and_save_angles()
+
+    start_time = time.time()
     draw_from_file(screen, points_surface, ANGLES_FILE)
     end_time = time.time()
 
