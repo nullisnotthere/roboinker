@@ -271,7 +271,7 @@ def _calculate_smooth_pwr(contour):
     # Measure curvature
     x = np.linspace(0, 1, len(contour))
     y = contour[:, 1]
-    poly_coeffs = np.polyfit(x, y, 2)  # Quadratic fit (ax² + bx + c)
+    poly_coeffs = np.polyfit(x, y, 2)  # Quadratic fit (ax^2 + bx + c)
     curvature = abs(poly_coeffs[0])  # The 'a' coeff represents curve strength
 
     if linearity_score > 0.95 and curvature < 0.005:
