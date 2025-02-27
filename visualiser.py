@@ -29,6 +29,11 @@ BASE = 65
 ARM1 = ARM2 = 250
 PEN_OFFSET = 30
 
+# The value to increase the detail level by when contour count is too low
+DETAIL_LEVEL_INCREMENT = 0.1
+CONTOURS_COUNT_UPPER = 50
+CONTOURS_COUNT_LOWER = 15
+
 
 def gen_image_and_save_angles():
     """Prompt user for input, get the image based on the prompt, process
@@ -52,13 +57,37 @@ def gen_image_and_save_angles():
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
-    # TODO: retry with higher detail if contour count less than min number
-    # TODO: handle `requests.exceptions.ReadTimeout: HTTPSConnectionPool(
-    #       host='paint.api.wombo.ai', port=443): Read timed out.
-    #       (read timeout=20)`
-
     print('Getting contours...')
-    contours = im_proc.extract_contours(img, arm_max_length=ARM1 + ARM2)
+    contours = ()
+    detail_level = im_proc.get_image_detail_level(img, 1_000, 50_000)
+
+    # Itervatively adapt the contour detail if the resulting contour
+    # count is too high/too low
+    while True:
+        contours = im_proc.extract_contours(
+            img,
+            arm_max_length=ARM1 + ARM2,
+            detail_level=detail_level
+        )
+        print(f"Contour count: {len(contours)}")
+
+        new_detail_level = detail_level
+        if len(contours) > CONTOURS_COUNT_UPPER:
+            new_detail_level -= DETAIL_LEVEL_INCREMENT
+        elif len(contours) < CONTOURS_COUNT_LOWER:
+            new_detail_level += DETAIL_LEVEL_INCREMENT
+
+        # If the countour count is within bounds or if the detail is at
+        # an extremity, then do not recalculate contours
+        if new_detail_level == detail_level or not 0 <= new_detail_level >= 1:
+            break
+
+        # Update to the new detail level and recalculate contours
+        # in the next loop iteration
+        detail_level = new_detail_level
+        print(f"Number of countours is out of bounds: {len(contours)}.\n"
+              f"Retrying with new detail level: {detail_level:.2f}")
+        time.sleep(0.5)  # Short pause for debugging
 
     print('Sorting contours')
     contours = im_proc.sort_contours(contours)

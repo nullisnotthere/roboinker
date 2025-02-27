@@ -38,7 +38,8 @@ def get_image_new_dimen(cv_img, arm_max_length) -> tuple[int, int]:
 
 def extract_contours(
         opencv_image,
-        arm_max_length):
+        arm_max_length,
+        detail_level: float | None = None):
     """Filter image and extract simplified and smooth contours using RDP and
     B-splines."""
 
@@ -67,11 +68,15 @@ def extract_contours(
     edges = cv2.Canny(img, *edge_det_threshold)
 
     # Compute detail level (between 0 and 1)
-    detail_level = _image_detail_level(
-        edges,
-        min_variance=1_000,
-        max_variance=50_000
-    )
+    if detail_level is None:
+        detail_level: float = get_image_detail_level(
+            edges,
+            min_variance=1_000,
+            max_variance=50_000
+        )
+    elif not 0 <= detail_level <= 1:
+        detail_level: float = np.clip(detail_level, 0, 1)
+
     print(f"Detail level: {detail_level}")
 
     min_cont_points_ignore = _interpolate_value(
@@ -168,13 +173,30 @@ def save_motor_angles(
                     f.write("PEN DOWN\n")
 
 
+def get_image_detail_level(
+        cv_image,
+        min_variance=0,
+        max_variance=50_000) -> float:
+    """Get the detail level of a given image by calculating
+    laplacian variance. Max ~50,000"""
+    laplacian = cv2.Laplacian(cv_image, cv2.CV_64F)
+    variance = laplacian.var()
+    print(f"Variance: {variance}")
+
+    # Normalize the variance between 0 and 1
+    normalized_var = (variance - min_variance) / (max_variance - min_variance)
+
+    # Clamp the value to the range [0, 1]
+    normalized_var = np.clip(normalized_var, 0, 1)
+    return normalized_var
+
+
 def _max_rect_from_semi(
         width: float,
         height: float,
         radius: float) -> tuple[float, float]:
     # Calculates the new width and height required to fit a semicircle of
     # given radius while maintaining aspect ratio.
-
     w = radius / math.sqrt((height / width) ** 2 + (1 / 4))
     h = math.sqrt(radius ** 2 - (w ** 2) / 4)
     return w, h
@@ -317,21 +339,6 @@ def _get_smoothed_contours(
             smoothed_contours.append(simplified_contour)
 
     return smoothed_contours
-
-
-def _image_detail_level(cv_image, min_variance=0, max_variance=1_000):
-    # Get the detail level of a given image by calculating
-    # laplacian variance. Max ~50,000
-    laplacian = cv2.Laplacian(cv_image, cv2.CV_64F)
-    variance = laplacian.var()
-    print(f"Variance: {variance}")
-
-    # Normalize the variance between 0 and 1
-    normalized_var = (variance - min_variance) / (max_variance - min_variance)
-
-    # Clamp the value to the range [0, 1]
-    normalized_var = np.clip(normalized_var, 0, 1)
-    return normalized_var
 
 
 def _normalized_histogram_contrast(cv_image) -> float:
