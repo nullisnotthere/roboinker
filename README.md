@@ -50,7 +50,7 @@ DEEP_AI_API_KEY='Your Deep AI API key'
 3. Navigate to `IndexedDB`/`https://dream.ai`/`firebaseLocalStorageDb (default)`/`firebaseLocalStorage`
 4. Click the `firebase:authUser` entry
 5. On the right navigate to `value`/`apiKey` and (right-click) copy the value
-6. Use this as the `API_KEY` value in `.env`
+6. Use this as the `DREAM_AI_API_KEY` value in `.env`
 
 ### How to get Deep AI API Key
 
