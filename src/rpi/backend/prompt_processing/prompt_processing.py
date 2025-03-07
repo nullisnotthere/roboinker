@@ -10,7 +10,7 @@ import re
 
 from dotenv import load_dotenv
 from requests.exceptions import HTTPError
-from rpi.backend.prompt_processing.deep_ai_wrapper import api as deep_ai_api
+from src.rpi.backend.prompt_processing.deep_ai_wrapper import api as deep_api
 
 
 load_dotenv()
@@ -46,7 +46,7 @@ DEEP_AI_EXTRACTION_PREFIX = (
     "please only return the word EMPTY. "
     "Here is the prompt for you to parse: "
 )
-DEEP_AI_API_KEY = os.getenv("API_KEY")
+DEEP_AI_API_KEY = os.getenv("DEEP_AI_API_KEY")
 
 
 def _force_clean_text(text: str) -> str:
@@ -88,9 +88,16 @@ def extract_essential_phrase(prompt: str, retries=3, delay=2) -> str:
 
     for t in range(retries + 1):
         try:
-            response = next(deep_ai_api.chat(DEEP_AI_API_KEY, messages))
+            # Ensure API key exists in .env
+            if not DEEP_AI_API_KEY:
+                raise RuntimeError(
+                    "Could not retreive Deep AI API key environment variable."
+                )
+
+            response = next(deep_api.chat(DEEP_AI_API_KEY, messages))
             if response is not None:
                 return response
+
         except (HTTPError, StopIteration) as e:
             print(
                 "An error occured when trying to extract essential phrase "
@@ -100,6 +107,7 @@ def extract_essential_phrase(prompt: str, retries=3, delay=2) -> str:
             if t <= retries:
                 print(f"Retrying... ({t + 1})")
             time.sleep(delay)
+
         finally:
             # This always gets called,
             # but does not affect the successful response return

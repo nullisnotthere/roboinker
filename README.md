@@ -27,19 +27,23 @@ This software depends on two (free) external AI web apps;
 An account will need to be created for each of these websites to
 gain access to the required API keys and Authorization Tokens.
 
-### Dream AI configuration
-
-`src/rpi/backend/image_generation/.env`
+`.env`
 
 ```env
-# Dream AI sensitive environment variables
-EMAIL='YOUR_DREAM_AI_EMAIL'
-PASSWORD='YOUR_DREAM_AI_PASSWORD'
-API_KEY='YOUR_DREAM_AI_API_KEY'
-AUTHORIZATION_TOKEN='null'
+# Sensitive environment variables for Dream AI
+DREAM_AI_EMAIL='Your Dream AI email'
+DREAM_AI_PASSWORD='Your Dream AI password'
+DREAM_AI_API_KEY='Your Dream AI API key'
+
+# Do not configure. This will automatically be retrieved.
+DREAM_AI_AUTH_TOKEN='null'
+
+
+# Sensitive environment variables for Deep AI
+DEEP_AI_API_KEY='Your Deep AI API key'
 ```
 
-How to get Dream AI API Key:
+### How to get Dream AI API Key
 
 1. [Sign Up to Dream AI](https://dream.ai/profile)
 2. Ctrl+Shift+I and navigate to `Storage` tab
@@ -48,16 +52,7 @@ How to get Dream AI API Key:
 5. On the right navigate to `value`/`apiKey` and (right-click) copy the value
 6. Use this as the `API_KEY` value in `.env`
 
-### Deep AI configuration
-
-`src/rpi/backend/prompt_processing/.env`
-
-```env
-# Deep AI sensitive environment variables
-API_KEY='YOUR_DEEP_AI_API_KEY'
-```
-
-How to get Deep AI API Key:
+### How to get Deep AI API Key
 
 1. [Sign up to Deep AI](https://deepai.org/)
 2. Navigate to [your dashboard](https://deepai.org/dashboard/profile)

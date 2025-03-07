@@ -57,7 +57,7 @@ class ImageResponse:
 def _get_new_auth_token() -> str | None:
     # Function to refresh the authorization token via web requests to dream.ai
 
-    api_key = os.getenv("API_KEY")
+    api_key = os.getenv("DREAM_AI_API_KEY")
     refresh_url = f"{SIGN_IN_URL}accounts:signInWithPassword?key={api_key}"
 
     headers = {
@@ -65,8 +65,8 @@ def _get_new_auth_token() -> str | None:
     }
 
     data = {
-        "email": os.getenv("EMAIL"),
-        "password": os.getenv("PASSWORD"),
+        "email": os.getenv("DREAM_AI_EMAIL"),
+        "password": os.getenv("DREAM_AI_PASSWORD"),
         "returnSecureToken": True
     }
 
@@ -85,8 +85,8 @@ def _get_new_auth_token() -> str | None:
 
         if new_auth_token:
             print(f"New auth token: {new_auth_token}")
-            os.environ["AUTHORIZATION_TOKEN"] = new_auth_token
-            set_key(DOT_ENV_PATH, "AUTHORIZATION_TOKEN", new_auth_token)
+            os.environ["DREAM_AI_AUTH_TOKEN"] = new_auth_token
+            set_key(DOT_ENV_PATH, "DREAM_AI_AUTH_TOKEN", new_auth_token)
 
             return new_auth_token
 
@@ -117,7 +117,7 @@ def _load_headers() -> dict[str, str]:
         print(f"Could not open headers file: {HEADERS_FILE}")
 
     # Update with sensitive auth data from .env
-    auth_token = os.getenv("AUTHORIZATION_TOKEN")
+    auth_token = os.getenv("DREAM_AI_AUTH_TOKEN")
 
     if not auth_token:
         raise ValueError("Missing required environment variables.")

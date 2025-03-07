@@ -12,12 +12,12 @@ import time
 import pygame
 import cv2
 
-from rpi.backend.ik import ik_visualiser
-from rpi.backend.prompt_processing import prompt_processing as prompt_proc
-from rpi.backend.voice_processing.voice_processing import VoiceProcessor
-from rpi.backend.image_processing import image_processing as img_proc
-from rpi.backend.image_generation.dream_api_wrapper import generate_image, ImageResponse
-from rpi.backend.image_generation.art_styles import ArtStyle
+from src.rpi.backend.ik import ik_visualiser
+from src.rpi.backend.prompt_processing import prompt_processing as prompt_proc
+from src.rpi.backend.voice_processing.voice_processing import VoiceProcessor
+from src.rpi.backend.image_processing import image_processing as img_proc
+from src.rpi.backend.image_generation.dream_api_wrapper import generate_image, ImageResponse
+from src.rpi.backend.image_generation.art_styles import ArtStyle
 
 
 WIDTH, HEIGHT = 1000, 700
