@@ -19,6 +19,7 @@ import requests
 from requests.exceptions import ReadTimeout
 import numpy as np
 import cv2
+import fake_useragent
 from cv2.typing import MatLike
 from dotenv import load_dotenv, set_key
 from .art_styles import ArtStyle
@@ -122,7 +123,14 @@ def _load_headers() -> dict[str, str]:
     if not auth_token:
         raise ValueError("Missing required environment variables.")
 
-    headers.update({"Authorization": "bearer " + auth_token})
+    # Create random, fake user agent to store in header
+    user_agent: str = fake_useragent.UserAgent().random
+    headers.update(
+        {
+            "User-Agent": f"{user_agent}",
+            "Authorization": f"bearer {auth_token}"
+        }
+    )
     return headers
 
 

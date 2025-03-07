@@ -42,8 +42,9 @@ DEEP_AI_EXTRACTION_PREFIX = (
     "Notice how the users mind changed after suggesting the spear, "
     "so it is excluded from the final prompt and the new object (sword) "
     "in included. Use this as a guide when you parse my following prompts. "
-    "If there is no prompt provided, or the prompt is utterly unintelligible, "
-    "please only return the word EMPTY. "
+    "Only return back the new prompt text, do not include a prefix like "
+    "new prompt: or anything similar. If there is no prompt provided, or the "
+    "prompt is utterly unintelligible, please only return the word EMPTY. "
     "Here is the prompt for you to parse: "
 )
 DEEP_AI_API_KEY = os.getenv("DEEP_AI_API_KEY")
