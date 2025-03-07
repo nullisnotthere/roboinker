@@ -5,7 +5,7 @@ This API Wrapper interacts with 'Dream by WOMBO' to generate images from the
 web and retreive them as OpenCV images.
 
 Sources:
-https://github.com/krisskad/DreamAI?tab=readme-ov-file
+https://github.com/krisskad/DreamAI
 https://dream.ai/create
 """
 
@@ -16,7 +16,7 @@ import os
 import time
 import json
 import requests
-from requests.exceptions import ConnectionError, ReadTimeout
+from requests.exceptions import ReadTimeout
 import numpy as np
 import cv2
 from cv2.typing import MatLike
@@ -89,6 +89,8 @@ def _get_new_auth_token() -> str | None:
             set_key(DOT_ENV_PATH, "AUTHORIZATION_TOKEN", new_auth_token)
 
             return new_auth_token
+
+    # TODO: handle connection error when retreiving new auth token!!!!
 
     print(
         "Failed to retrieve auth token."

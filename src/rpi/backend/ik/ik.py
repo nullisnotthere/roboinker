@@ -6,7 +6,6 @@ a desired target point.
 
 Source: https://github.com/vishwas1101/Inverse-Kinematic-Robot-Arm/blob/
         master/InverseKinematics/IK_Simulation.py
-Refactored and debugged via ChatGPT and https://github.com/nullisnotthere/
 """
 
 import math

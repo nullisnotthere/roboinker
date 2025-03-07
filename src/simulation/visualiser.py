@@ -11,19 +11,20 @@ import os
 import time
 import pygame
 import cv2
-from ik import ik_visualiser
 
-from image_processing import image_processing as im_proc
-from image_generation.prompt_processing import filter_prompt
-from image_generation.dream_api_wrapper import generate_image, ImageResponse
-from image_generation.art_styles import ArtStyle
+from rpi.backend.ik import ik_visualiser
+from rpi.backend.prompt_processing import prompt_processing as prompt_proc
+from rpi.backend.voice_processing.voice_processing import VoiceProcessor
+from rpi.backend.image_processing import image_processing as img_proc
+from rpi.backend.image_generation.dream_api_wrapper import generate_image, ImageResponse
+from rpi.backend.image_generation.art_styles import ArtStyle
 
 
 WIDTH, HEIGHT = 1000, 700
 FPS = 3000
 BG_COLOUR = pygame.Color("White")
 DIR = os.path.dirname(os.path.abspath(__file__))
-ANGLES_FILE = os.path.join(DIR, "output.angles")
+ANGLES_FILE = os.path.join(DIR, "..", "..", "data/output.angles")
 
 BASE = 65
 ARM1 = ARM2 = 250
@@ -35,11 +36,37 @@ CONTOURS_COUNT_UPPER = 50
 CONTOURS_COUNT_LOWER = 15
 
 
+def get_prompt_from_voice():
+    """Get a text prompt from a voice command."""
+    full_text = ""
+
+    try:
+        vp = VoiceProcessor()
+        vp.start_listening()
+
+        while True:
+            result = vp.process_voice()
+            print(result)
+
+            text = result.get("text")
+            if text:
+                full_text += text + ". "
+
+    except KeyboardInterrupt:
+        print("\nDone")
+    finally:
+        vp.stop_listening()
+
+    return full_text
+
+
 def gen_image_and_save_angles():
     """Prompt user for input, get the image based on the prompt, process
     the image, and save the motor angles to the ouput angles file."""
 
-    prompt = filter_prompt(input("Enter prompt: "))
+    prompt_from_voice = get_prompt_from_voice()
+    essence = prompt_proc.extract_essential_phrase(prompt_from_voice)
+    prompt = prompt_proc.add_image_gen_params(essence)
     print(f"{prompt=}")
 
     img_response: ImageResponse = generate_image(prompt, ArtStyle.DREAMLAND_V3)
@@ -59,12 +86,12 @@ def gen_image_and_save_angles():
 
     print('Getting contours...')
     contours = ()
-    detail_level = im_proc.get_image_detail_level(img, 1_000, 50_000)
+    detail_level = img_proc.get_image_detail_level(img, 1_000, 50_000)
 
     # Itervatively adapt the contour detail if the resulting contour
     # count is too high/too low
     while True:
-        contours = im_proc.extract_contours(
+        contours = img_proc.extract_contours(
             img,
             arm_max_length=ARM1 + ARM2,
             detail_level=detail_level
@@ -90,17 +117,17 @@ def gen_image_and_save_angles():
         time.sleep(0.5)  # Short pause for debugging
 
     print('Sorting contours')
-    contours = im_proc.sort_contours(contours)
+    contours = img_proc.sort_contours(contours)
 
     print("Getting optimal dimensions")
-    img_w, _ = im_proc.get_image_new_dimen(img, ARM1 + ARM2)
+    img_w, _ = img_proc.get_image_new_dimen(img, ARM1 + ARM2)
 
     print('Saving motor angles')
-    im_proc.save_motor_angles(
+    img_proc.save_motor_angles(
         contours,
         BASE, ARM1, ARM2,
         offset=(0, -img_w, PEN_OFFSET + BASE),
-        output_file="output.angles"
+        output_file=ANGLES_FILE
     )
 
 

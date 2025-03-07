@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 from scipy.interpolate import splprep, splev
 from scipy.spatial import distance
-from ik import ik
+from ..ik import ik
 
 
 # Wide is used for high contrast, narrow is for low contrast
