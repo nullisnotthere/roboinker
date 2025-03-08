@@ -2,7 +2,7 @@
 .env
 
 # Ignore sample images
-data/test_images/
+data/sample_images/
 
 # Ignore compiled Python files
 __pycache__/
