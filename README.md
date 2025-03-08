@@ -1,7 +1,11 @@
 # Software for Speech-to-text, AI-powered 2-DOF Robotic Arm
 
-This is all of the software that manages AI, speech-to-text, image processing,
-and motor control.
+Provides all of the software for a 3D-printed, 2-DOF robotic arm that draws images
+with a pen using AI and speech recognition. The repo provides a
+[visualiser](https://github.com/nullisnotthere/roboinker/blob/main/src/simulation/visualiser.py)
+script to demonstrate the backend processes in action.
+
+This is for my Year 12 Systems Engineering final project.
 
 ## How to Use
 
@@ -57,3 +61,20 @@ DEEP_AI_API_KEY='Your Deep AI API key'
 1. [Sign up to Deep AI](https://deepai.org/)
 2. Navigate to [your dashboard](https://deepai.org/dashboard/profile)
 3. Copy your API key
+
+## Code Flow
+
+1. Transcribe speech from microphone with
+   [Vosk API](https://github.com/alphacep/vosk-api/tree/master/python)
+2. Extract key ideas from voice prompt using a [Deep AI](https://deepai.org/)
+   [API wrapper](https://github.com/nullisnotthere/roboinker/tree/main/src/rpi/backend/prompt_processing/deep_ai_wrapper)
+3. Tune the prompt for image generation and pass it to a [Dream AI](https://dream.ai/)
+   [API wrapper](https://github.com/nullisnotthere/roboinker/blob/main/src/rpi/backend/image_generation/dream_api_wrapper.py)
+4. Convert the generated image to drawable contours using
+   [various algorithms](https://github.com/nullisnotthere/roboinker/blob/main/src/rpi/backend/image_processing/image_processing.py)
+5. Using the contour points, calculate and store the robotic arm's motor angles
+   and drawing instructions in the
+   [`output.angles`](https://github.com/nullisnotthere/roboinker/tree/main/data)
+   file
+6. Visualise the robotic arm's drawing process using
+   [inverse kinematics](https://github.com/nullisnotthere/roboinker/tree/main/src/rpi/backend/ik)
