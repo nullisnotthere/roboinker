@@ -1,9 +1,8 @@
 # Ignore sensitive information (Python dotenv)
 .env
 
-# Ignore images
-test_images/
-*.png
+# Ignore sample images
+data/test_images/
 
 # Ignore compiled Python files
 __pycache__/
