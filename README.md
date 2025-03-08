@@ -18,6 +18,8 @@
 
 </div>
 
+![3D model of the finished robotic arm in Blender](images/arm_mode.png)
+
 ## Description
 
 Provides all of the software for a 3D-printed, 2-DOF robotic arm that draws images
@@ -96,4 +98,5 @@ DEEP_AI_API_KEY='Your Deep AI API key'
    and drawing instructions in the `data/output.angles` file
 6. Visualise the robotic arm's drawing process using
    [inverse kinematics](https://github.com/nullisnotthere/roboinker/tree/main/src/rpi/backend/ik)
+
 
