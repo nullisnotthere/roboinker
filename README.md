@@ -18,7 +18,9 @@
 
 </div>
 
-![3D model of the finished robotic arm in Blender](images/arm_model.png)
+<p align="center">
+  <img src="images/logo.png" alt="3D model of the finished robotic arm in Blender" width="300">
+</p>
 
 ## Description
 
