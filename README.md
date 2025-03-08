@@ -1,3 +1,4 @@
+# RoboInker
 
 <div align="center">
 
@@ -14,7 +15,7 @@
 
 </div>
 
-# Software for Speech-to-text, AI-powered 2-DOF Robotic Arm
+## Description
 
 Provides all of the software for a 3D-printed, 2-DOF robotic arm that draws images
 with a pen using AI and speech recognition. The repo provides a
@@ -94,3 +95,4 @@ DEEP_AI_API_KEY='Your Deep AI API key'
    file
 6. Visualise the robotic arm's drawing process using
    [inverse kinematics](https://github.com/nullisnotthere/roboinker/tree/main/src/rpi/backend/ik)
+
