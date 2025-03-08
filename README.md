@@ -18,8 +18,6 @@
 
 </div>
 
-<img src="images/arm_model.png" alt="3D model of the finished robotic arm in Blender" width="600">
-
 ## Description
 
 Provides all of the software for a 3D-printed, 2-DOF robotic arm that draws images
@@ -28,6 +26,8 @@ with a pen using AI and speech recognition. The repo provides a
 script to demonstrate the backend processes in action.
 
 This is for my Year 12 Systems Engineering final project.
+
+<img src="images/arm_model.png" alt="3D model of the finished robotic arm in Blender" width="600">
 
 ## Usage Guide
 
