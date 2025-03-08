@@ -23,7 +23,7 @@ script to demonstrate the backend processes in action.
 
 This is for my Year 12 Systems Engineering final project.
 
-## How to Use
+## Usage Guide
 
 This software requires a **Raspberry PI (5)** and **Arduino Uno** configured with
 **CNC shield**
