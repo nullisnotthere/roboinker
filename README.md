@@ -50,7 +50,7 @@ python src/simulation/visualiser.py
 
 This software depends on two (free) external AI web apps:
 [Deep AI](https://deepai.org/) and [Dream AI](https://dream.ai/create).
-An account will need to be created for each of these websites to
+An account will need to be created for both of these websites to
 gain access to the required API keys and Authorization Tokens.
 
 `.env`
