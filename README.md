@@ -18,9 +18,7 @@
 
 </div>
 
-<p align="center">
-  <img src="images/arm_model.png" alt="3D model of the finished robotic arm in Blender" width="600">
-</p>
+<img src="images/arm_model.png" alt="3D model of the finished robotic arm in Blender" width="600">
 
 ## Description
 
