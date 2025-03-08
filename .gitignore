@@ -2,7 +2,7 @@
 .env
 
 # Ignore images
-images/
+test_images/
 *.png
 
 # Ignore compiled Python files
