@@ -18,7 +18,7 @@
 
 </div>
 
-![3D model of the finished robotic arm in Blender](images/arm_mode.png)
+![3D model of the finished robotic arm in Blender](images/arm_model.png)
 
 ## Description
 
