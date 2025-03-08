@@ -24,6 +24,7 @@ PROMPT_SUFFIX = (
     "No small details."
 )
 
+# Quote characters can not be used as they break the Deep AI request
 DEEP_AI_EXTRACTION_PREFIX = (
     "You are now a natural language processing robot. "
     "I will give you a prompt phrase that is to later be fed "
@@ -41,7 +42,7 @@ DEEP_AI_EXTRACTION_PREFIX = (
     "New prompt: Knight holding sword riding horse. "
     "Notice how the users mind changed after suggesting the spear, "
     "so it is excluded from the final prompt and the new object (sword) "
-    "in included. Use this as a guide when you parse my following prompts. "
+    "is included. Use this as a guide when you parse my following prompts. "
     "Only return back the new prompt text, do not include a prefix like "
     "new prompt: or anything similar. If there is no prompt provided, or the "
     "prompt is utterly unintelligible, please only return the word EMPTY. "
