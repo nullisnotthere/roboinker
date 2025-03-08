@@ -93,9 +93,7 @@ DEEP_AI_API_KEY='Your Deep AI API key'
 4. Convert the generated image to drawable contours using
    [various algorithms](https://github.com/nullisnotthere/roboinker/blob/main/src/rpi/backend/image_processing/image_processing.py)
 5. Using the contour points, calculate and store the robotic arm's motor angles
-   and drawing instructions in the
-   [`output.angles`](https://github.com/nullisnotthere/roboinker/tree/main/data)
-   file
+   and drawing instructions in the `data/output.angles` file
 6. Visualise the robotic arm's drawing process using
    [inverse kinematics](https://github.com/nullisnotthere/roboinker/tree/main/src/rpi/backend/ik)
 
