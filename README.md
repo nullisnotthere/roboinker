@@ -1,5 +1,3 @@
-# RoboInker
-
 <div align="center">
 
 ```py
