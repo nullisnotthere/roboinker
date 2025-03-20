@@ -4,6 +4,9 @@
 # Ignore sample images
 data/sample_images/
 
+# Planning files
+plan*.md
+
 # Ignore compiled Python files
 __pycache__/
 *.pyc
