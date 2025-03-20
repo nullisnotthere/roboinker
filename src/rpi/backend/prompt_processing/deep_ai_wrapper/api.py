@@ -7,6 +7,7 @@ import requests
 import fake_useragent
 
 from requests_toolbelt.multipart.encoder import MultipartEncoder
+from requests.exceptions import ReadTimeout, ConnectTimeout
 
 from .key import get_random_str
 from .api_typing import Messages, CompletionsGenerator
@@ -91,21 +92,34 @@ def chat(
     )
 
     # Send the request
-    response = requests.post(
-        URL,
-        headers=headers,
-        cookies=cookies,
-        data=_encoder,
-        stream=True,
-        timeout=45
-    )
+    success = False
+    while not success:
+        try:
+            response = requests.post(
+                URL,
+                headers=headers,
+                cookies=cookies,
+                data=_encoder,
+                stream=True,
+                timeout=45
+            )
 
-    # Raise an exception if the status code is not 200
-    response.raise_for_status()
+            # Raise an exception if the status code is not 200
+            response.raise_for_status()
+            success = True
+        except (
+                ConnectionError,
+                ReadTimeout,
+                ConnectTimeout,
+                requests.exceptions.ConnectionError) as req_err:
 
-    # logging
+            print(
+                f"Deep AI prompt filtering response failed at '{URL}'\n"
+                f"{req_err}"
+            )
+
     print(f"Sent request to {URL} with code {response.status_code}")
 
-    # iterate over the response
+    # Iterate over the response
     for line in response.iter_lines():
         yield line.decode('utf-8')

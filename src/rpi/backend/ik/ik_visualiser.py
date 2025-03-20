@@ -34,14 +34,14 @@ def draw_arms(angles: tuple[float, float, float] | None,
               arm2: float,
               pen_offset: float,
               screen: pygame.Surface,
-              return_only: bool = False) -> Vector2 | None:
+              only_return: bool = False) -> Vector2 | None:
     """Draw the arm to the screen given the desired point"""
 
     if not angles:
         print(f"NO ANGLES TO DRAW! {angles=}")
         return None
 
-    ang_base, ang_arm1, ang_arm2 = angles
+    ang_base, ang_arm1, ang_arm2 = angles[1], angles[2], angles[0]
     ang_base = 90 - ang_base
 
     base_screen = Vector2(screen.get_width() // 2, screen.get_height() - base)
@@ -72,7 +72,7 @@ def draw_arms(angles: tuple[float, float, float] | None,
     a2_tv_end = Vector2(tv_a1_end.x + a2_tv_len, tv_a1_end.y)
     a2_tv_start, a2_tv_end = _rotate_line(a2_tv_start, a2_tv_end, -ang_base)
 
-    if return_only:
+    if only_return:
         return a2_tv_end  # Return the pen tip's end position
 
     # Pen

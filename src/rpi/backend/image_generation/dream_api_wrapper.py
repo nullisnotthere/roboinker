@@ -16,7 +16,7 @@ import os
 import time
 import json
 import requests
-from requests.exceptions import ReadTimeout
+from requests.exceptions import ReadTimeout, ConnectTimeout
 import numpy as np
 import cv2
 import fake_useragent
@@ -91,8 +91,6 @@ def _get_new_auth_token() -> str | None:
 
             return new_auth_token
 
-    # TODO: handle connection error when retreiving new auth token!!!!
-
     print(
         "Failed to retrieve auth token."
         f"Status code: {response.status_code}."
@@ -142,13 +140,25 @@ def _check_task_status(task_id: str, timeout: float) -> dict | None:
 
     headers = _load_headers()
 
-    response = requests.get(
-        f"{GENERATE_IMAGE_URL}/{task_id}",
-        headers=headers,
-        timeout=timeout
-    )
-    if response.status_code == 200:
-        return response.json()
+    try:
+        response = requests.get(
+            f"{GENERATE_IMAGE_URL}/{task_id}",
+            headers=headers,
+            timeout=timeout
+        )
+        if response.status_code == 200:
+            return response.json()
+    except (
+            ConnectionError,
+            ReadTimeout,
+            ConnectTimeout,
+            requests.exceptions.ConnectionError) as req_err:
+        # Returns None on failure to connect or time out
+        print(
+            f"Task status check failed at '{GENERATE_IMAGE_URL}'\n"
+            f"{req_err}"
+        )
+        return None
 
     print(f"Error checking task status: {response.json()}")
     return None  # Response failed
@@ -170,8 +180,12 @@ def _poll_for_gen_rq_task_id(data: dict, retries: int = 3) -> str | None:
                 timeout=30,
             )
             time.sleep(5)
-        except (ConnectionError, ReadTimeout) as req_err:
-            # Returns None on failure to connect or request time out
+        except (
+                ConnectionError,
+                ReadTimeout,
+                ConnectTimeout,
+                requests.exceptions.ConnectionError) as req_err:
+            # Returns None on failure to connect or time out
             print(
                 f"Generation response failed at '{GENERATE_IMAGE_URL}'\n"
                 f"{req_err}"
@@ -198,7 +212,6 @@ def _poll_for_gen_rq_task_id(data: dict, retries: int = 3) -> str | None:
 
             # Refresh and store new token
             _get_new_auth_token()
-
             continue
 
         print(

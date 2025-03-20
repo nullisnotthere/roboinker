@@ -16,19 +16,22 @@ from src.rpi.backend.ik import ik_visualiser
 from src.rpi.backend.prompt_processing import prompt_processing as prompt_proc
 from src.rpi.backend.voice_processing.voice_processing import VoiceProcessor
 from src.rpi.backend.image_processing import image_processing as img_proc
-from src.rpi.backend.image_generation.dream_api_wrapper import generate_image, ImageResponse
 from src.rpi.backend.image_generation.art_styles import ArtStyle
+from src.rpi.backend.image_generation.dream_api_wrapper import (
+    generate_image, ImageResponse
+)
 
 
 WIDTH, HEIGHT = 1000, 700
 FPS = 3000
 BG_COLOUR = pygame.Color("White")
 DIR = os.path.dirname(os.path.abspath(__file__))
-ANGLES_FILE = os.path.join(DIR, "..", "..", "data/output.angles")
+ANGLES_FILE = os.path.join(DIR, "..", "..", "data/output.motctl")
 
 BASE = 65
 ARM1 = ARM2 = 250
 PEN_OFFSET = 30
+PEN_UP_OFFSET = 5  # This much higher when pen is up
 
 # The value to increase the detail level by when contour count is too low
 DETAIL_LEVEL_INCREMENT = 0.1
@@ -88,13 +91,13 @@ def gen_image_and_save_angles():
     contours = ()
     detail_level = img_proc.get_image_detail_level(img, 1_000, 50_000)
 
-    # Itervatively adapt the contour detail if the resulting contour
+    # Iteratively adapt the contour detail if the resulting contour
     # count is too high/too low
     while True:
         contours = img_proc.extract_contours(
             img,
             arm_max_length=ARM1 + ARM2,
-            detail_level=detail_level
+            initial_detail_level=detail_level
         )
         print(f"Contour count: {len(contours)}")
 
@@ -105,7 +108,8 @@ def gen_image_and_save_angles():
             new_detail_level += DETAIL_LEVEL_INCREMENT
 
         # If the countour count is within bounds or if the detail is at
-        # an extremity, then do not recalculate contours
+        # an extremity, then do not recalculate contours as we cannot
+        # further tweak the detail level.
         if new_detail_level == detail_level or not 0 <= new_detail_level >= 1:
             break
 
@@ -127,6 +131,7 @@ def gen_image_and_save_angles():
         contours,
         BASE, ARM1, ARM2,
         offset=(0, -img_w, PEN_OFFSET + BASE),
+        pen_up_offset=PEN_UP_OFFSET,
         output_file=ANGLES_FILE
     )
 
@@ -153,18 +158,21 @@ def draw_from_file(
             if not drawing:
                 break
 
+            # Parse line
             line = line.strip()
-            has_params = ":" in line
-            cmd = line.split(":")[0] if has_params else line
-            params = line.split(":")[1].split(",") if has_params else None
+            has_params = line[-1] != "$"
+            cmd = line.split("$")[0]
+            params = line.split("$")[1].split(",") if has_params else None
+            pairs = dict(p.split(":") for p in (params if params else []))
             angles = None
 
-            # Parse the output angles file
             match cmd:
                 case "NO ANGLES":
                     continue
-                case "ANGLES" if params:
-                    angles = tuple(map(float, params))
+                case "SET ANGLES" if params:
+                    angles = tuple(map(float, pairs.values()))
+                case "SET SPEEDS" if params:
+                    speeds = tuple(map(float, params.values()))
                 case "PEN UP":
                     is_pen_down = False
                 case "PEN DOWN":
@@ -191,7 +199,7 @@ def draw_from_file(
 
             # Store the pen tip position without drawing the arms
             pen_point = ik_visualiser.draw_arms(
-                angles, BASE, ARM1, ARM2, PEN_OFFSET, screen, return_only=True
+                angles, BASE, ARM1, ARM2, PEN_OFFSET, screen, only_return=True
             )
 
             # Draw straight line between points

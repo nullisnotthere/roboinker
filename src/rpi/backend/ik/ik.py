@@ -38,7 +38,8 @@ def get_point(x, y, z, base, arm1, arm2, alpha):
 
 
 def get_angles(x, y, z, base, arm1, arm2):
-    """Calculate joint angles required to reach the target point."""
+    """Calculate joint angles (base angle, angle of arm 1, angle of arm 2)
+    required to reach the target point."""
     d = math.sqrt(x**2 + y**2 + (z - base) ** 2)
 
     if d > arm1 + arm2:
@@ -52,6 +53,7 @@ def get_angles(x, y, z, base, arm1, arm2):
         math.acos((arm1**2 + arm2**2 - d**2) / (2 * arm1 * arm2))
     )
 
+    # Base angle, angle of arm 1, angle of arm 2
     return alpha, beta, gamma
 
 

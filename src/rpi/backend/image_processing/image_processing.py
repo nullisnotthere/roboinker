@@ -39,7 +39,7 @@ def get_image_new_dimen(cv_img, arm_max_length) -> tuple[int, int]:
 def extract_contours(
         opencv_image,
         arm_max_length,
-        detail_level: float | None = None):
+        initial_detail_level: float | None = None):
     """Filter image and extract simplified and smooth contours using RDP and
     B-splines."""
 
@@ -68,14 +68,16 @@ def extract_contours(
     edges = cv2.Canny(img, *edge_det_threshold)
 
     # Compute detail level (between 0 and 1)
-    if detail_level is None:
-        detail_level: float = get_image_detail_level(
+    if initial_detail_level is None:
+        detail_level = get_image_detail_level(
             edges,
             min_variance=1_000,
             max_variance=50_000
         )
-    elif not 0 <= detail_level <= 1:
-        detail_level: float = np.clip(detail_level, 0, 1)
+    elif not 0 <= initial_detail_level <= 1:
+        detail_level: float = np.clip(initial_detail_level, 0, 1)
+    else:
+        detail_level = initial_detail_level
 
     print(f"Detail level: {detail_level}")
 
@@ -144,33 +146,42 @@ def sort_contours(contours):
 
 def save_motor_angles(
         contours,
-        base, arm1, arm2, offset,
-        output_file="output.angles",
+        base, arm1, arm2, offset, pen_up_offset,
+        output_file="output.motctl",
         scale=1.0) -> None:
     """Converts contours to motor angles for robot arm firmware."""
     with open(output_file, "w", encoding="utf-8") as f:
         for contour in contours:
             for point_index, point in enumerate(contour):
-                if point_index == 0:
-                    f.write("PEN UP\n")
+                # When reading the first point of the contour, we must put
+                # the pen up first before moving it into position
+                if pen_up := point_index == 0:
+                    f.write("PEN UP$\n")
 
-                # Point x, y, z
+                # Angles are of the form: BASE, ANG_ARM_1, ANG_ARM_2
                 angles = ik.get_angles(
                     x=(point[0] + offset[0]) * scale,
                     y=(point[1] + offset[1]) * scale,
-                    z=offset[2] * scale,
+                    z=(offset[2] + (pen_up_offset if pen_up else 0)) * scale,
                     base=base, arm1=arm1, arm2=arm2
                 )
 
                 if angles:
-                    # Angle x, y, z
-                    ax, ay, az = angles
-                    f.write(f"ANGLES:{ax},{ay},{az}\n")
-                else:
-                    f.write("NO ANGLES\n")
+                    # We need to re-order to X, Y, Z form
+                    # X = ANG_ARM_2 (index 2)
+                    # Y = BASE      (index 0)
+                    # Z = ANG_ARM_1 (index 1)
 
-                if point_index == 0:
-                    f.write("PEN DOWN\n")
+                    # TODO: A axis (pen compensation angle)
+                    # TODO: maybe use list instead of ax ay az
+                    ax, ay, az = angles[2], angles[0], angles[1]
+                    f.write(f"SET ANGLES$x:{ax},y:{ay},z:{az}\n")
+                else:
+                    f.write("NO ANGLES$\n")
+
+                # Pen must go down after reaching the pen up target coordinates
+                if pen_up:
+                    f.write("PEN DOWN$\n")
 
 
 def get_image_detail_level(
