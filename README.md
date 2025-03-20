@@ -96,6 +96,6 @@ DEEP_AI_API_KEY='Your Deep AI API key'
    [various algorithms](https://github.com/nullisnotthere/roboinker/blob/main/src/rpi/backend/image_processing/image_processing.py)
 5. Using the contour points, calculate and store the robotic arm's motor angles
    and drawing instructions in the `data/output.motctl` file (for more info see
-   [.motctl documentation](https://github.com/nullisnotthere/roboinker/blob/main/MOTCTL_LANG.md))
+   [.motctl documentation](https://github.com/nullisnotthere/roboinker/blob/main/MOTCTL.md)
 6. Visualise the robotic arm's drawing process using
    [inverse kinematics](https://github.com/nullisnotthere/roboinker/tree/main/src/rpi/backend/ik)
