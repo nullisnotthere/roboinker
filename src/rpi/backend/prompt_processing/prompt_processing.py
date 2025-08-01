@@ -1,7 +1,9 @@
 """
 Handles prompt processing and filtering to convert spoken text strings
-to a clean,
-structured prompt for Dream AI (https://dream.ai/)
+to a clean, structured prompt for Dream AI (https://dream.ai/)
+
+Sources:
+    ai4free (https://github.com/SreejanPersonal/ai4free-wrapper)
 """
 
 import os
@@ -10,7 +12,7 @@ import re
 
 from dotenv import load_dotenv
 from requests.exceptions import HTTPError
-from src.rpi.backend.prompt_processing.deep_ai_wrapper import api as deep_api
+from webscout.AIbase import Provider
 
 
 load_dotenv()
@@ -25,7 +27,7 @@ PROMPT_SUFFIX = (
 )
 
 # Quote characters can not be used as they break the Deep AI request
-DEEP_AI_EXTRACTION_PREFIX = (
+AI_EXTRACTION_PREFIX = (
     "You are now a natural language processing robot. "
     "I will give you a prompt phrase that is to later be fed "
     "into an image generation AI that will produce an image that "
@@ -42,18 +44,19 @@ DEEP_AI_EXTRACTION_PREFIX = (
     "New prompt: Knight holding sword riding horse. "
     "Notice how the users mind changed after suggesting the spear, "
     "so it is excluded from the final prompt and the new object (sword) "
-    "is included. Use this as a guide when you parse my following prompts. "
-    "Only return back the new prompt text, do not include a prefix like "
-    "new prompt: or anything similar. If there is no prompt provided, or the "
-    "prompt is utterly unintelligible, please only return the word EMPTY. "
+    "is included. Also, avoid including prefix phrases like 'picture of...' "
+    "or 'an image showing...'. Please use this as a guide when you parse "
+    "my following prompts. Only return back the new prompt text, do not "
+    "include a prefix like 'new prompt:' or anything similar. If there is "
+    "no prompt provided, or the prompt is utterly unintelligible, please "
+    "only return the word 'EMPTY'. "
     "Here is the prompt for you to parse: "
 )
-DEEP_AI_API_KEY = os.getenv("DEEP_AI_API_KEY")
 
 
 def _force_clean_text(text: str) -> str:
     # Strips and converts text to only use the allowed characters to
-    # ensure compatibility with Deep AI.
+    # ensure compatibility with certain AI APIs.
     allowed_chars = r",\.-;:=+/*&^%$#@!()\[\]{}<> "
     escaped_chars = "\\".join(allowed_chars)
     filtered_text = re.sub(
@@ -64,58 +67,37 @@ def _force_clean_text(text: str) -> str:
     return filtered_text
 
 
-def extract_essential_phrase(prompt: str, retries=3, delay=2) -> str:
-    """Using Deep AI via an API wrapper, this function extracts the 'essence'
+def extract_essential_phrase(
+        ai: Provider,
+        prompt: str,
+        retries=3,
+        delay=2) -> str:
+    """Using AI via an API wrapper, this function extracts the 'essence'
     of the user's prompt, ensuring a minimal and effective prompt
     simplification."""
 
-    print(f"{_force_clean_text(prompt)=}")
+    prompt = _force_clean_text(AI_EXTRACTION_PREFIX + prompt)
+    print(f"{prompt=}")
 
-    # Pre-defined chat message history
-    messages = [
-        {
-            "role": "user",
-
-            "content": _force_clean_text(DEEP_AI_EXTRACTION_PREFIX)
-        },
-        {
-            "role": "assistant",
-            "content": "EMPTY"
-        },
-        {
-            "role": "user",
-            "content": f"Prompt: {_force_clean_text(prompt)}"
-        }
-    ]
-
-    for t in range(retries + 1):
+    for t in range(retries + 1):  # Keep retrying
         try:
-            # Ensure API key exists in .env
-            if not DEEP_AI_API_KEY:
-                raise RuntimeError(
-                    "Could not retreive Deep AI API key environment variable."
-                )
+            response = ai.chat(prompt)
 
-            response = next(deep_api.chat(DEEP_AI_API_KEY, messages))
-            if response is not None:
-                return response
+            print(f"\nResponse from prompt AI: {response}\n")
+            return response
+        except HTTPError as e:
+            print(f"An error occured when trying to extract essential phrase "
+                  f"using KOBOLD AI: {e}\nRetrying...")
 
-        except (HTTPError, StopIteration) as e:
-            print(
-                "An error occured when trying to extract essential phrase "
-                f"via Deep AI API wrapper: {e}. The prompt has been returned "
-                "as the essential phrase. "
-            )
+            # Retry debug and delay before retrying
             if t <= retries:
                 print(f"Retrying... ({t + 1})")
             time.sleep(delay)
-
         finally:
-            # This always gets called,
-            # but does not affect the successful response return
             response = prompt
 
-    print(f"Deep AI API connection failed after {retries} retries.")
+    print(f"Prompt extraction AI API connection failed after {retries} "
+          f"retries.")
     return response
 
 

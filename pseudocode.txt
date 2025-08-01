@@ -1,0 +1,48 @@
+pi sends ASK READY
+arduino sends READY
+pi receives READY
+
+for all chunks stored in pi
+    pi sends **chunk data** starting with ^ ending with $
+    arduino parses non-chunk commands
+        if arduino gets ASK READY
+            send READY
+        if arduino gets START CHUNK
+            set internal flag inChunk to true
+    pi listens for RECEIVED CHUNK DATA
+        pi stores **chunk data**
+    pi sends START CHUNK
+    arduino receives START CHUNK
+    arduino parses chunk commands line by line through stored **chunk data**
+        if line is DONE:
+            free memory
+            arduino sends ALL CHUNKS DONE
+        elif line is END CHUNK
+            set internal flag inChunk to false
+        elif line is SET ORIGIN
+            set current position for all motors
+        elif line is motor movement step values (line starts with @)
+            stepper.move() for all steppers to STEP values
+            block with while loop for stepper.run()
+    arduino frees memory
+    arduino sends REQUEST NEXT CHUNK
+    pi receives REQUEST NEXT CHUNK
+    pi sends **chunk data**
+
+
+MOTCTL:
+
+&800
+^
+@100 -50 100 100
+SET ORIGIN
+$
+&500
+@100 100 100 100
+@50 30 20 10
+@-20 -50 -100 -1
+^
+DONE
+STOP
+$
+

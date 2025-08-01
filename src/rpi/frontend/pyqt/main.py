@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 # pylint: disable=E0611
+from dotenv import load_dotenv
+import os
 import sys
 import time
 import serial
@@ -16,8 +18,9 @@ class Backend(QObject):
     """Handles backend processes of PyQML declarations."""
 
     AXES = ("x", "y", "z", "a")
-    SERIAL_PORT = "/dev/ttyUSB0"
-    BAUD_RATE = 9600
+    MAX_SPEED = 300  # Steps/sec
+    SERIAL_PORT = os.getenv("ARDUINO_PORT")
+    BAUD_RATE = os.getenv("ARDUINO_BAUDRATE")
 
     def __init__(self):
         super().__init__()
@@ -48,7 +51,8 @@ class Backend(QObject):
         if self.arduino_ser and self.arduino_ser.is_open:
             data = "SET SPEEDS$"
             data += "".join([
-                f"{axis}:{speed}," for axis, speed in self.motor_speeds.items()
+                f"{axis}:{speed * self.MAX_SPEED},"
+                for axis, speed in self.motor_speeds.items()
             ]) + "\n"
             self.arduino_ser.write(data.encode())  # Send data
             time.sleep(0.1)  # Short delay before reading response

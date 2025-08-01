@@ -4,6 +4,9 @@
 # Ignore sample images
 data/sample_images/
 
+# Ignore Bing token info
+bing_token.json
+
 # Planning files
 plan*.md
 

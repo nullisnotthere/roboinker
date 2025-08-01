@@ -4,7 +4,7 @@ Inverse kinematics mathematics for a 2-DOF robotic arm.
 Contains a function to show the graphed visualisation of the arm given
 a desired target point.
 
-Source: https://github.com/vishwas1101/Inverse-Kinematic-Robot-Arm/blob/
+Sources: https://github.com/vishwas1101/Inverse-Kinematic-Robot-Arm/blob/
         master/InverseKinematics/IK_Simulation.py
 """
 
@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 
 
 #  pylint: disable=too-many-locals
-def get_point(x, y, z, base, arm1, arm2, alpha):
+def _get_point(x, y, z, base, arm1, arm2, alpha):
     """Calculate the intermediate joint position of the robotic arm."""
     e = (x**2 + y**2 + z**2 - base**2 + arm1**2 - arm2**2) / 2
 
@@ -37,7 +37,43 @@ def get_point(x, y, z, base, arm1, arm2, alpha):
     return a, b, c
 
 
-def get_angles(x, y, z, base, arm1, arm2):
+def get_nearest_valid_point(x, y, z, base, arm1, arm2):
+    """Returns the coordinates of the nearest point within the sphere
+    defined by the arm lengths. If the point is already within the sphere
+    the original point is returned."""
+    if check_point_in_bounds(x, y, z, base, arm1, arm2):
+        return x, y, z
+
+    radius = arm1 + arm2
+    dx, dy, dz = x, y, z - base
+    length = math.sqrt(dx ** 2 + dy ** 2 + dz ** 2)
+
+    # Handle exact center point
+    if length == 0:
+        return (0, 0, base + radius)
+
+    # Calculate unit vector
+    dx /= length
+    dy /= length
+    dz /= length
+
+    # Scale direction by radius
+    nearest_x = dx * radius
+    nearest_y = dy * radius
+    nearest_z = dz * radius + base
+
+    return (nearest_x, nearest_y, nearest_z)
+
+
+def check_point_in_bounds(x, y, z, base, arm1, arm2) -> bool:
+    """Check whether a point can be reached by the arm given the
+    configuration."""
+    radius = arm1 + arm2
+    distance = math.sqrt(x ** 2 + y ** 2 + (z - base) ** 2)
+    return distance <= radius
+
+
+def get_ik_angles(x, y, z, base, arm1, arm2):
     """Calculate joint angles (base angle, angle of arm 1, angle of arm 2)
     required to reach the target point."""
     d = math.sqrt(x**2 + y**2 + (z - base) ** 2)
@@ -57,16 +93,36 @@ def get_angles(x, y, z, base, arm1, arm2):
     return alpha, beta, gamma
 
 
+def get_real_angles(px, py, pz, base, arm1, arm2,
+                    decimals=2) -> dict[str, float] | None:
+    """Takes in points for X, Y, Z and returns the angles for the motors on
+    the robotic arm. Adjusts for relevant offsets in real life and returns
+    a dictionary of the form X, Y, Z, A."""
+    ik_angles = get_ik_angles(px, py, pz, base, arm1, arm2)
+
+    # Return None if the angles are invalid
+    if ik_angles is None:
+        return None
+
+    ang_base, ang_arm1, ang_arm2 = ik_angles
+    return {
+        "x": round(ang_arm2 - 180, decimals),
+        "y": round(ang_base - 180, decimals),
+        "z": round(-ang_arm1 + 90, decimals),
+        "a": round(ang_arm2 + ang_arm1 - 270, decimals)
+    }
+
+
 def plot_arm(base, arm1, arm2, x, y, z):
     """Plot the robotic arm configuration."""
-    angles = get_angles(x, y, z, base, arm1, arm2)
+    angles = get_ik_angles(x, y, z, base, arm1, arm2)
     if not angles:
         print("The point can't be reached.")
         return
 
     ang_base, ang_arm1, ang_arm2 = angles
 
-    point = get_point(x, y, z, base, arm1, arm2, ang_base)
+    point = _get_point(x, y, z, base, arm1, arm2, ang_base)
     if point is None:
         raise ValueError(f"Invalid point: {point}")
 

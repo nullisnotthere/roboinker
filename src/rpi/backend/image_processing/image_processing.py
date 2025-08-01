@@ -1,6 +1,6 @@
 """
 Handles image processing.
-Method to threshold and filter image contours from AI-generated image.
+Functions to threshold and filter image contours from an AI-generated image.
 """
 
 import math
@@ -8,7 +8,8 @@ import cv2
 import numpy as np
 from scipy.interpolate import splprep, splev
 from scipy.spatial import distance
-from ..ik import ik
+
+from src.rpi.backend.ik.ik import get_real_angles
 
 
 # Wide is used for high contrast, narrow is for low contrast
@@ -26,7 +27,7 @@ EPSILON_RANGE = (0.05, 0.5)
 SMOOTHNESS_RANGE = (10, 90)
 
 
-def get_image_new_dimen(cv_img, arm_max_length) -> tuple[int, int]:
+def calculate_image_new_dimen(cv_img, arm_max_length) -> tuple[int, int]:
     """Returns the new width and height for an image given an arm maximum
     extension. This is the optimal image area within the arm's semicirclular
     arc while maintaining the image's aspect ratio. The aspect ratio is
@@ -43,8 +44,8 @@ def extract_contours(
     """Filter image and extract simplified and smooth contours using RDP and
     B-splines."""
 
+    # Calculate image contrast
     constrast = _normalized_histogram_contrast(opencv_image)
-    print(f"Contrast: {constrast}")
 
     # Convert the image to grayscale
     img = cv2.cvtColor(opencv_image, cv2.COLOR_RGB2GRAY)
@@ -53,7 +54,7 @@ def extract_contours(
     img = cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
 
     # Resize image based on arm_max_length
-    img = cv2.resize(img, get_image_new_dimen(img, arm_max_length))
+    img = cv2.resize(img, calculate_image_new_dimen(img, arm_max_length))
 
     # This second rotation compensates for the screen Y coord corresponding to
     # the arm's X coord. IMPORTANT!!!
@@ -69,7 +70,7 @@ def extract_contours(
 
     # Compute detail level (between 0 and 1)
     if initial_detail_level is None:
-        detail_level = get_image_detail_level(
+        detail_level = calculate_image_detail_level(
             edges,
             min_variance=1_000,
             max_variance=50_000
@@ -78,8 +79,6 @@ def extract_contours(
         detail_level: float = np.clip(initial_detail_level, 0, 1)
     else:
         detail_level = initial_detail_level
-
-    print(f"Detail level: {detail_level}")
 
     min_cont_points_ignore = _interpolate_value(
         MIN_CONT_PTS_IGNORE_RANGE,
@@ -105,12 +104,15 @@ def extract_contours(
     )
 
     # Debug
+    print(f"Contours extracted. Contour count: {len(contours)}")
     print(f'''
-        {min_cont_points_ignore=},
-        {min_cont_points_smooth=},
-        {linscape_threshold=},
-        {epsilon=},
-        {smoothness=},
+        {constrast=}
+        {min_cont_points_ignore=}
+        {min_cont_points_smooth=}
+        {linscape_threshold=}
+        {epsilon=}
+        {smoothness=}
+        {detail_level=}
     ''')
 
     return _get_smoothed_contours(
@@ -149,42 +151,85 @@ def save_motor_angles(
         base, arm1, arm2, offset, pen_up_offset,
         output_file="output.motctl",
         scale=1.0) -> None:
-    """Converts contours to motor angles for robot arm firmware."""
+    """
+    Converts contours to motor angles to be interpreted by the robot arm's
+    firmware.
+    """
     with open(output_file, "w", encoding="utf-8") as f:
         for contour in contours:
             for point_index, point in enumerate(contour):
                 # When reading the first point of the contour, we must put
                 # the pen up first before moving it into position
-                if pen_up := point_index == 0:
-                    f.write("PEN UP$\n")
+                is_pen_up = bool(point_index == 0)
+
+                px = (point[0] + offset[0]) * scale
+                py = (point[1] + offset[1]) * scale
+                pz = (offset[2] + (pen_up_offset if is_pen_up else 0)) * scale
 
                 # Angles are of the form: BASE, ANG_ARM_1, ANG_ARM_2
-                angles = ik.get_angles(
-                    x=(point[0] + offset[0]) * scale,
-                    y=(point[1] + offset[1]) * scale,
-                    z=(offset[2] + (pen_up_offset if pen_up else 0)) * scale,
-                    base=base, arm1=arm1, arm2=arm2
+                angles = get_real_angles(
+                    px, py, pz, base, arm1, arm2
                 )
-
+                # We need to re-order to X, Y, Z form
+                # X = ANG_ARM_2 (index 2)
+                # Y = BASE      (index 0)
+                # Z = ANG_ARM_1 (index 1)
                 if angles:
-                    # We need to re-order to X, Y, Z form
-                    # X = ANG_ARM_2 (index 2)
-                    # Y = BASE      (index 0)
-                    # Z = ANG_ARM_1 (index 1)
-
-                    # TODO: A axis (pen compensation angle)
-                    # TODO: maybe use list instead of ax ay az
                     ax, ay, az = angles[2], angles[0], angles[1]
-                    f.write(f"SET ANGLES$x:{ax},y:{ay},z:{az}\n")
+                    ax, ay, az = round(ax, 2), round(ay, 2), round(az, 2)
+
+                    print(f"For points {px}, {py}, {px} "
+                          f"got angles: {ax}, {ay}, {az}")
+
+                    f.write("SET ANGLES\n")
+                    f.write(f"@X:{ax}\n")
+                    f.write(f"@Y:{ay}\n")
+                    f.write(f"@Z:{az}\n")
+                    f.write(f"@A:{aa}\n")
                 else:
-                    f.write("NO ANGLES$\n")
+                    f.write("NO ANGLES\n")
 
-                # Pen must go down after reaching the pen up target coordinates
-                if pen_up:
-                    f.write("PEN DOWN$\n")
+def extract_and_refine_contour_count(
+        cv_image,
+        detail_level_adaptation_step: float,
+        min_contour_count: int,
+        max_contour_count: int,
+        arm_max_length):
+    """
+    Iteratively adapt the contour detail and recalculate contours if the
+    resultant contour count is too high or too low.
+    """
+
+    detail_level = calculate_image_detail_level(cv_image, 1_000, 50_000)
+
+    while True:
+        contours = extract_contours(
+            cv_image,
+            arm_max_length=arm_max_length,
+            initial_detail_level=detail_level
+        )
+        new_detail_level = detail_level
+        if len(contours) > max_contour_count:
+            new_detail_level -= detail_level_adaptation_step
+        elif len(contours) < min_contour_count:
+            new_detail_level += detail_level_adaptation_step
+
+        # If the countour count is within bounds or if the detail is at
+        # an extremity, then do not recalculate contours as we cannot
+        # further tweak the detail level.
+        if new_detail_level == detail_level or not 0 <= new_detail_level >= 1:
+            break
+
+        # Update to the new detail level and recalculate contours
+        # in the next loop iteration
+        detail_level = new_detail_level
+        print(f"Number of countours is out of bounds: {len(contours)}.\n"
+              f"Refining with new detail level: {detail_level:.2f}")
+
+    return contours
 
 
-def get_image_detail_level(
+def calculate_image_detail_level(
         cv_image,
         min_variance=0,
         max_variance=50_000) -> float:
@@ -286,6 +331,7 @@ def _interpolate_value(
 
 
 def _calculate_smooth_pwr(contour):
+    # Calculates the smoothing exponent.
     # Returns 1 if mostly straight, 3 if curvy.
 
     if len(contour) < 5:
@@ -310,6 +356,13 @@ def _calculate_smooth_pwr(contour):
     if linearity_score > 0.95 and curvature < 0.005:
         return 1  # Mostly straight, use linear smoothing
     return 3  # Mostly curved, use cubic smoothing
+
+
+def _dedupe_contour(contour):
+    """Remove duplicate points from a (n, 2) contour array."""
+    # Use np.unique with axis=0 to remove duplicate rows
+    _, idx = np.unique(contour, axis=0, return_index=True)
+    return contour[np.sort(idx)]
 
 
 def _get_smoothed_contours(
@@ -345,6 +398,7 @@ def _get_smoothed_contours(
                     tck
                 )
             ).T
+            smooth_contour = _dedupe_contour(smooth_contour)
             smoothed_contours.append(smooth_contour)
         else:
             smoothed_contours.append(simplified_contour)

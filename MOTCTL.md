@@ -20,8 +20,8 @@ robotic arm accordingly.
 
 ## Commands
 
-- `SET ANGLES`
-- `SET SPEEDS`
-- `PEN UP`
-- `PEN DOWN`
-- `NO ANGLES`
+- `SET ANGLES`: Specify target angles for the arm to move to
+- `SET SPEEDS`: Specify speeds for each of the arm's motors
+- `PEN UP`: Mark pen as up
+- `PEN DOWN`: Mark pen as down
+- `NO ANGLES`: No angles provided, skip (useful for debugging)

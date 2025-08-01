@@ -11,135 +11,50 @@ import os
 import time
 import pygame
 import cv2
+import ai4free
+from dotenv import load_dotenv
 
 from src.rpi.backend.ik import ik_visualiser
 from src.rpi.backend.prompt_processing import prompt_processing as prompt_proc
-from src.rpi.backend.voice_processing.voice_processing import VoiceProcessor
+from src.rpi.backend.voice_processing import voice_processing as voice_proc
 from src.rpi.backend.image_processing import image_processing as img_proc
-from src.rpi.backend.image_generation.art_styles import ArtStyle
-from src.rpi.backend.image_generation.dream_api_wrapper import (
-    generate_image, ImageResponse
-)
+from src.rpi.backend.image_generation.bing_image_gen import BingImageCreator
+from src.rpi.backend.image_generation.bing_token_retriever import get_token
+from src.rpi.backend.image_generation.image_extractor import extract_image
 
+load_dotenv()
 
+# Ensure API key environment variables exist
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+if GROQ_API_KEY is None:
+    raise RuntimeError("Missing required environment variable: GROQ_API_KEY")
+
+BING_IMAGE_GEN_API_KEY = os.getenv("BING_IMAGE_GEN_API_KEY")
+if BING_IMAGE_GEN_API_KEY is None:
+    raise RuntimeError("Missing required environment variable: "
+                       "BING_IMAGE_GEN_API_KEY")
+
+# Window settings
 WIDTH, HEIGHT = 1000, 700
-FPS = 3000
 BG_COLOUR = pygame.Color("White")
+FPS = 3000
+
+# Directories
 DIR = os.path.dirname(os.path.abspath(__file__))
-ANGLES_FILE = os.path.join(DIR, "..", "..", "data/output.motctl")
+ANGLES_FILE_PATH = os.path.join(DIR, "..", "..", "data/output.motctl")
 
-BASE = 65
-ARM1 = ARM2 = 250
-PEN_OFFSET = 30
-PEN_UP_OFFSET = 5  # This much higher when pen is up
+# Robotic arm configuration
 
-# The value to increase the detail level by when contour count is too low
-DETAIL_LEVEL_INCREMENT = 0.1
-CONTOURS_COUNT_UPPER = 50
-CONTOURS_COUNT_LOWER = 15
-
-
-def get_prompt_from_voice():
-    """Get a text prompt from a voice command."""
-    full_text = ""
-
-    try:
-        vp = VoiceProcessor()
-        vp.start_listening()
-
-        while True:
-            result = vp.process_voice()
-            print(result)
-
-            text = result.get("text")
-            if text:
-                full_text += text + ". "
-
-    except KeyboardInterrupt:
-        print("\nDone")
-    finally:
-        vp.stop_listening()
-
-    return full_text
-
-
-def gen_image_and_save_angles():
-    """Prompt user for input, get the image based on the prompt, process
-    the image, and save the motor angles to the ouput angles file."""
-
-    prompt_from_voice = get_prompt_from_voice()
-    essence = prompt_proc.extract_essential_phrase(prompt_from_voice)
-    prompt = prompt_proc.add_image_gen_params(essence)
-    print(f"{prompt=}")
-
-    img_response: ImageResponse = generate_image(prompt, ArtStyle.DREAMLAND_V3)
-    print(
-        f"Image generation "
-        f"{"failed" if img_response.cv_image is None else "completed"}\n"
-        f"Status: {img_response.status.name}\n"
-        f"Message: {img_response.message}"
-    )
-    if img_response.cv_image is None:
-        return
-
-    img = img_response.cv_image
-    cv2.imshow("Image from Dream AI", img)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-
-    print('Getting contours...')
-    contours = ()
-    detail_level = img_proc.get_image_detail_level(img, 1_000, 50_000)
-
-    # Iteratively adapt the contour detail if the resulting contour
-    # count is too high/too low
-    while True:
-        contours = img_proc.extract_contours(
-            img,
-            arm_max_length=ARM1 + ARM2,
-            initial_detail_level=detail_level
-        )
-        print(f"Contour count: {len(contours)}")
-
-        new_detail_level = detail_level
-        if len(contours) > CONTOURS_COUNT_UPPER:
-            new_detail_level -= DETAIL_LEVEL_INCREMENT
-        elif len(contours) < CONTOURS_COUNT_LOWER:
-            new_detail_level += DETAIL_LEVEL_INCREMENT
-
-        # If the countour count is within bounds or if the detail is at
-        # an extremity, then do not recalculate contours as we cannot
-        # further tweak the detail level.
-        if new_detail_level == detail_level or not 0 <= new_detail_level >= 1:
-            break
-
-        # Update to the new detail level and recalculate contours
-        # in the next loop iteration
-        detail_level = new_detail_level
-        print(f"Number of countours is out of bounds: {len(contours)}.\n"
-              f"Retrying with new detail level: {detail_level:.2f}")
-        time.sleep(0.5)  # Short pause for debugging
-
-    print('Sorting contours')
-    contours = img_proc.sort_contours(contours)
-
-    print("Getting optimal dimensions")
-    img_w, _ = img_proc.get_image_new_dimen(img, ARM1 + ARM2)
-
-    print('Saving motor angles')
-    img_proc.save_motor_angles(
-        contours,
-        BASE, ARM1, ARM2,
-        offset=(0, -img_w, PEN_OFFSET + BASE),
-        pen_up_offset=PEN_UP_OFFSET,
-        output_file=ANGLES_FILE
-    )
+# The value to change the detail level by when too high/low
+DETAIL_LEVEL_ADAPT = 0.1
+CONTOURS_COUNT_MAX = 50
+CONTOURS_COUNT_MIN = 15
 
 
 def draw_from_file(
         screen: pygame.Surface,
         points_surface: pygame.Surface,
-        file_path: str):
+        file_path: str) ->  None:
     """Draws a visualisation of the robotic arm's movement and draw path
     based on the angles defined in the angles file."""
 
@@ -166,6 +81,7 @@ def draw_from_file(
             pairs = dict(p.split(":") for p in (params if params else []))
             angles = None
 
+            # Parse each command accordingly
             match cmd:
                 case "NO ANGLES":
                     continue
@@ -224,25 +140,120 @@ def draw_from_file(
             clock.tick(FPS)
 
 
+def get_prompt_from_voice(vp: voice_proc.VoiceProcessor) -> str:
+    """Get text from a voice prompt via the microphone."""
+    full_text = ""
+
+    try:
+        vp.start_listening()
+
+        while True:
+            result = vp.process_voice()
+            print(result)
+
+            text = result.get("text")
+            if text:
+                full_text += text + ". "
+
+    except KeyboardInterrupt:
+        print("\nDone")
+    finally:
+        vp.stop_listening()
+
+    return full_text
+
+
 def main() -> None:
     """Main function."""
+    # Init PyGame window
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("Robotic Arm Visualizer")
-
     points_surface = pygame.Surface(screen.get_size())
     running = True
 
-    gen_image_and_save_angles()
+    ######################
+    # GENERATION PROCESS #
+    ######################
 
-    start_time = time.time()
-    draw_from_file(screen, points_surface, ANGLES_FILE)
-    end_time = time.time()
+    # Create an instance of the voice processor
+    voice_processor = voice_proc.VoiceProcessor()
 
-    elapsed_time = end_time - start_time
-    print(f"Done. Took {elapsed_time:.2f} seconds.")
+    # Get the prompt from voice input
+    prompt_from_voice = get_prompt_from_voice(voice_processor)
 
-    # Show image until user quits
+    # Create an instance of the prompt AI
+    prompt_ai = ai4free.GROQ(
+        api_key=GROQ_API_KEY,  # pyright: ignore
+        model="meta-llama/llama-4-scout-17b-16e-instruct"
+    )
+
+    # Extract the essence of the voice prompt
+    essence = prompt_proc.extract_essential_phrase(
+        ai=prompt_ai,
+        prompt=prompt_from_voice
+    )
+
+    # Add the image generation parameters to the prompt essence
+    prompt = prompt_proc.add_image_gen_params(essence)
+
+    # Initialise the image generator (Bing)
+    token = get_token()
+    print(token)
+    image_generator = BingImageCreator(cookies=[token])
+
+    # Generate image URLs from the final prompt
+    images = image_generator.generate_images_sync(
+        prompt=prompt,
+        model="dall-e-3"
+    )
+
+    # Check that images generate successfully
+    if not images:
+        print("Failed to generate images. Token may be expired, refreshing.")
+        return
+
+    # Extract the final images from the URLs
+    img = extract_image(images[0])
+
+    # Check that the extraction was successful
+    if img is None:
+        print("Failed to extract image.")
+        return
+
+    # Iteratively extract and refine contours from the image
+    contours = img_proc.extract_and_refine_contour_count(
+        img,
+        DETAIL_LEVEL_ADAPT,
+        CONTOURS_COUNT_MIN,
+        CONTOURS_COUNT_MAX,
+        ARM1 + ARM2
+    )
+
+    # Sort the contours to reduce pen movement distances
+    contours = img_proc.sort_contours(contours)
+
+    # Calculate the image's optimal dimensions based on the arm's maximum arc
+    img_w, _ = img_proc.calculate_image_new_dimen(img, ARM1 + ARM2)
+
+    # Save the motor angles to a .motctl file
+    img_proc.save_motor_angles(
+        contours,
+        BASE, ARM1, ARM2,
+        offset=(0, -img_w, PEN_OFFSET + BASE),
+        pen_up_offset=PEN_UP_OFFSET,
+        output_file=ANGLES_FILE_PATH
+    )
+
+    # Show the image
+    cv2.imshow("Image from AI", img)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+    # Read, interpret, and draw the saved motor angles to visualise the image
+    draw_from_file(screen, points_surface, ANGLES_FILE_PATH)
+
+    # Show visualiser until the user quits
     while running:
         screen.fill(BG_COLOUR)
         for event in pygame.event.get():

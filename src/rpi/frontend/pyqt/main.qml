@@ -16,8 +16,8 @@ ApplicationWindow {
         Text { text: "X Axis" }
         Slider {
             id: xSlider
-            from: -200
-            to: 200
+            from: -1
+            to: 1
             value: 0
             Layout.fillWidth: true
             onValueChanged: {
@@ -28,8 +28,8 @@ ApplicationWindow {
         Text { text: "Y Axis" }
         Slider {
             id: ySlider
-            from: -200
-            to: 200
+            from: -1
+            to: 1
             value: 0
             Layout.fillWidth: true
             onValueChanged: {
@@ -40,8 +40,8 @@ ApplicationWindow {
         Text { text: "Z Axis" }
         Slider {
             id: zSlider
-            from: -200
-            to: 200
+            from: -1
+            to: 1
             value: 0
             Layout.fillWidth: true
             onValueChanged: {
@@ -52,8 +52,8 @@ ApplicationWindow {
         Text { text: "A (Pen) Axis" }
         Slider {
             id: aAxis
-            from: -200
-            to: 200
+            from: -1
+            to: 1
             value: 0
             Layout.fillWidth: true
             onValueChanged: {
