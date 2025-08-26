@@ -9,7 +9,7 @@ import numpy as np
 from scipy.interpolate import splprep, splev
 from scipy.spatial import distance
 
-from src.rpi.backend.ik.ik import get_real_angles
+from src.rpi.backend.ik.ik import get_real_angles, deg_to_steps
 
 
 # Wide is used for high contrast, narrow is for low contrast
@@ -156,7 +156,10 @@ def save_motor_angles(
     firmware.
     """
     with open(output_file, "w", encoding="utf-8") as f:
-        for contour in contours:
+        chunks = []
+        chunk_lines = []
+        for contour_index, contour in enumerate(contours):
+            # Each chunk is ~10k characters
             for point_index, point in enumerate(contour):
                 # When reading the first point of the contour, we must put
                 # the pen up first before moving it into position
@@ -166,28 +169,49 @@ def save_motor_angles(
                 py = (point[1] + offset[1]) * scale
                 pz = (offset[2] + (pen_up_offset if is_pen_up else 0)) * scale
 
-                # Angles are of the form: BASE, ANG_ARM_1, ANG_ARM_2
-                angles = get_real_angles(
-                    px, py, pz, base, arm1, arm2
-                )
-                # We need to re-order to X, Y, Z form
-                # X = ANG_ARM_2 (index 2)
-                # Y = BASE      (index 0)
-                # Z = ANG_ARM_1 (index 1)
+                angles = get_real_angles(px, py, pz, base, arm1, arm2)
                 if angles:
-                    ax, ay, az = angles[2], angles[0], angles[1]
-                    ax, ay, az = round(ax, 2), round(ay, 2), round(az, 2)
-
-                    print(f"For points {px}, {py}, {px} "
-                          f"got angles: {ax}, {ay}, {az}")
-
-                    f.write("SET ANGLES\n")
-                    f.write(f"@X:{ax}\n")
-                    f.write(f"@Y:{ay}\n")
-                    f.write(f"@Z:{az}\n")
-                    f.write(f"@A:{aa}\n")
+                    print(angles["y"])
+                    ax = deg_to_steps(angles["x"])
+                    ay = deg_to_steps(angles["y"])
+                    az = deg_to_steps(angles["z"])
+                    aa = deg_to_steps(angles["a"])
+                    line = f"@{ax} {ay} {az} {aa}"
                 else:
-                    f.write("NO ANGLES\n")
+                    line = "NO ANGLES"
+
+                # If we exceed 10k characters or we're on the last line
+                char_count = len("\n".join(chunk_lines))
+
+                """
+                print(contour_index == len(contours) - 1)
+                print(point_index == len(contour) - 1)
+                """
+
+                if (char_count + len(line) > 10_000
+                        or (contour_index == len(contours) - 1
+                            and point_index == len(contour) - 1)):
+                    # Mark memory, start, end
+                    chunk_lines.insert(0, "START CHUNK")
+                    chunk_lines.append("END CHUNK$")
+
+                    mem_value = len("\n".join(chunk_lines)) + 1
+                    chunk_lines.insert(0, f"&{mem_value}")
+
+                    # Add current chunk lines buffer to the list of chunks
+                    chunks.append(chunk_lines.copy())
+
+                    print(chunk_lines)
+                    print(chunks)
+
+                    # Reset the buffer for the current line
+                    chunk_lines.clear()
+                else:
+                    chunk_lines.append(line)
+
+        all_lines = [line + "\n" for chunk in chunks for line in chunk]
+        f.writelines(all_lines)
+
 
 def extract_and_refine_contour_count(
         cv_image,

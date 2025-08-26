@@ -8,6 +8,8 @@ from dotenv import load_dotenv
 
 import serial
 
+from src.rpi.backend.ik.ik import deg_to_steps
+
 
 load_dotenv()
 
@@ -69,7 +71,7 @@ class ArduinoSerial:
                   f"{','.join(self._target_responses)}")
             return
 
-        print(f"Arduino is now listening for: {response_map}")
+        print(f"Arduino is now listening for: {response_map.keys()}")
         target_partial = partial(self._listen_serial, response_map)
         self._thread = threading.Thread(target=target_partial, daemon=True)
         self._thread.start()
@@ -90,9 +92,11 @@ class ArduinoSerial:
 
             # Catching unhandled responses
             if response not in response_map.keys():
-                print(f"Received unhandled response: '{response}'")
-                self._target_responses.clear()
-                return
+                if response:
+                    print(f"Received unhandled response: '{response}'")
+                # Maybe dont give up if we receive an unhandled response?
+                #self._target_responses.clear()
+                #return
 
             for target, callback in response_map.items():
                 if not response:
@@ -153,11 +157,11 @@ class ArduinoSerial:
                   data,
                   response_map: Mapping[str, Callable] | None = None
                   ) -> str | None:
+        return
         """
         Sends raw string MOTCTL formatted data to Arduino via serial.
         Pass a response map to handle certain responses from the Arduino.
         """
-
         if not (self.arduino_ser and self.arduino_ser.is_open):
             print("Error sending Serial data to Arduino.")
 
@@ -175,13 +179,15 @@ class ArduinoSerial:
     def send_angles(self, angles_data: dict[str, float], invert=False):
         """Sends the stored motor angles to the Arduino."""
         direction = -1 if invert else 1
+        x = deg_to_steps(angles_data["x"] * direction)
+        y = deg_to_steps(angles_data["y"] * direction)
+        z = deg_to_steps(angles_data["z"] * direction)
+        a = deg_to_steps(angles_data["a"] * direction)
 
-        lines_data = "".join([
-            f"@{axis[0].lower()} {angle * direction}\n"
-            for axis, angle in angles_data.items()
-        ])
+        cmd = f"^@{x} {y} {z} {a}"
+        print(f"sending angles cmd: {cmd}")
 
-        self.send_data(lines_data)
+        self.send_data(cmd)
 
     def close_serial(self):
         """Close serial connection on exit."""

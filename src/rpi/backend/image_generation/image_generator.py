@@ -1,156 +1,47 @@
 #!/usr/bin/env python3
 
-import time
-import re
-import random
-
-from urllib.parse import urljoin
-
 import requests
 import numpy as np
 import cv2
 
 from cv2.typing import MatLike
-from fake_useragent import UserAgent
-from bs4 import BeautifulSoup
+from src.rpi.backend.image_generation.bingart import BingArt
 
 BING_URL = "https://www.bing.com"
 
 
 def generate_images(prompt: str, u_token: str) -> list[MatLike] | None:
-    """Generates images using Bing AI and returns a list of OpenCV images."""
+    """
+    Generates images using Bing AI and returns a list of OpenCV images.
+    Source: https://github.com/DedInc/bingart/tree/main
+    """
 
-    ua = UserAgent()
-    headers = {
-        'User-Agent': ua.random,
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Origin': 'https://www.bing.com',
-        'DNT': '1',
-        'Sec-GPC': '1',
-        'Alt-Used': 'www.bing.com',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1',
-        'Sec-Fetch-Dest': 'document',
-        'Sec-Fetch-Mode': 'navigate',
-        'Sec-Fetch-Site': 'same-origin',
-        'Sec-Fetch-User': '?1',
-        'Priority': 'u=0, i',
-    }
+    bing_art = BingArt(auth_cookie_U=u_token)
 
-    cookies = {
-        '_C_Auth': '',
-        '_IDET': 'MIExp=0',
-        '_U': u_token,
-    }
+    try:
+        results = bing_art.generate_images(prompt)
 
-    data = {
-        'q': prompt,
-        'qs': 'ds'
-    }
+        # Return the extracted OpenCV images
+        cv_images = []
+        images = results.get("images")
 
-    # First response gets us the endpoint URL
-    response = requests.post(
-        f'https://www.bing.com/images/create?q={prompt}&rt=3',
-        cookies=cookies,
-        headers=headers,
-        data=data,
-        timeout=10
-    )
-    response.raise_for_status()
+        if images is None:
+            return None
 
-    # Parse for endpoint URL
-    endpoint = ""
-    soup = BeautifulSoup(response.text, 'html.parser')
-
-    # Guard clauses
-    results_div = soup.find("div", id="gir")
-    if not results_div:
-        print("No results div found.")
-        return None
-
-    data_c = str(results_div.get("data-c", ""))
-    if not data_c:
-        print("Failed to find results endpoint. It is likely that the prompt "
-              "has been blocked by Bing's content policy.")
-        return None
-
-    regex_match = re.match(r"^.*?(?=\?q\=)", data_c)
-    if not regex_match:
-        print(f"Failed to match regex in data-c element: {data_c}.")
-        return None
-
-    endpoint = regex_match.group(0)
-    url = urljoin(BING_URL, endpoint)
-
-    images = _get_images(url, cookies, headers)
-    return images
-
-
-def _get_images(
-        endpoint_url: str,
-        cookies,
-        headers,
-        tries=20,
-        delay=3) -> list[MatLike] | None:
-    # Tries to get a list of OpenCV images from the Bing endpoint URL
-
-    img_urls = []
-    for i in range(tries):
-        print(f"Trying to get images from generation endpoint {endpoint_url}."
-              f" Try #{i + 1}...")
-        time.sleep(delay)
-
-        response = requests.post(
-            endpoint_url,
-            cookies=cookies,
-            headers=headers,
-            timeout=10
-        )
-        response.raise_for_status()
-
-        # Parse for image URLs
-        soup = BeautifulSoup(response.text, 'html.parser')
-        img_elems = soup.find_all(class_=["image-row-img", "bceimg", "mimg"])
-
-        if not img_elems:
-            print("No images found this time.")
-            continue
-
-        # Store the image URLs found on the img elements in a list
-        img_urls = []
-        for img_elem in img_elems:
-            src = img_elem.get("src")
-
-            if src is None:
-                print("Could not find data-src attribute.")
+        # Extact URLs from BingAI data
+        urls = {img.get("url") for img in images if img.get("url")}
+        for url in urls:
+            # Get the images at those URLs
+            cv_img = _extract_image(url)
+            if cv_img is None:
                 continue
-
-            # Take the key URL component and adjust to 1024x1024 px resolution
-            url_match = re.match(r"^.*?\?", str(src))
-            if url_match:
-                url = url_match.group(0) + "w=1024&h=1024"
-                img_urls.append(url)
-        break
-
-    if not img_urls:
-        print("No images were found.")
-        return None
-
-    # Collect images on the endpoint page as OpenCV images
-    cv_images: list[MatLike] | None = []
-    for img_url in img_urls:
-        cv_image = _extract_image(img_url)
-        if cv_image is None:
-            # This error is already debug logged in the _extract_image function
-            continue
-        cv_images.append(cv_image)
-
-    return cv_images
+            cv_images.append(cv_img)
+        return cv_images
+    finally:
+        bing_art.close_session()
 
 
-def _extract_image(image_url: str) -> MatLike | None:
+def _extract_image(image_url) -> MatLike | None:
     # Extracts an image from a given image URL in OpenCV format.
 
     # Try to download image from final URL
@@ -172,4 +63,3 @@ def _extract_image(image_url: str) -> MatLike | None:
     except (IOError, ValueError) as img_err:
         print(f"Failed to convert response content to OpenCV image. {img_err}")
         return None
-

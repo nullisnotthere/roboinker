@@ -19,16 +19,22 @@ from src.rpi.frontend.arm_visualiser import (rotate_line, draw_arm_side_view,
                                              WHITE, RED, GREEN, BLUE, YELLOW,
                                              ORANGE)
 
-from src.rpi.backend.ik.ik import get_real_angles, get_nearest_valid_point
+from src.rpi.backend.ik.ik import (
+    get_real_angles,
+    get_nearest_valid_point,
+    steps_to_deg
+)
 from src.rpi.backend.serial_com.arduino_serial import ArduinoSerial
-from src.rpi.backend.constants import (ARM_LEN_1,
-                                       ARM_LEN_2,
-                                       BASE_HEIGHT,
-                                       PEN_ARM_LEN,
-                                       PEN_LEN,
-                                       BASE_SCREEN_OFFSET,
-                                       DRAG_ARM_HITBOX_SIZE,
-                                       ANGLES_FILE_PATH)
+from src.rpi.backend.constants import (
+    ARM_LEN_1,
+    ARM_LEN_2,
+    BASE_HEIGHT,
+    PEN_ARM_LEN,
+    PEN_LEN,
+    BASE_SCREEN_OFFSET,
+    DRAG_ARM_HITBOX_SIZE,
+    ANGLES_FILE_PATH
+)
 
 
 class MovePage(Page):
@@ -55,7 +61,10 @@ class MovePage(Page):
         self._preview_started = False
 
         self._arduino_ser = arduino_ser
-        self._arduino_ser.send_data("ASK READY")
+        self._arduino_ser.send_data(
+            "ASK READY",
+            {"READY": lambda: print("We're ready!")}
+        )
 
         # Initialise the UI elements
         self._top_frame = pygame_gui.elements.UIPanel(
@@ -131,19 +140,19 @@ class MovePage(Page):
             manager=ui_manager,
             text="Set Origin",
             container=self._bottom_frame,
-            command=partial(self._arduino_ser.send_data, "SET ORIGIN")
+            command=partial(self._arduino_ser.send_data, "^SET ORIGIN")
         )
         self._go_button = pygame_gui.elements.UIButton(
             relative_rect=Rect((210, 185), (90, 50)),
             manager=ui_manager,
-            text="GO",
+            text="Go",
             container=self._bottom_frame,
             command=self._go
         )
         self._go_inverse_button = pygame_gui.elements.UIButton(
             relative_rect=Rect((210, 235), (90, 30)),
             manager=ui_manager,
-            text="GO Inverse",
+            text="Go Inverse",
             container=self._bottom_frame,
             command=self._go_inverse
         )
@@ -155,9 +164,9 @@ class MovePage(Page):
             command=self._preview_motctl
         )
 
-    def _chunks_generator(self) -> Generator:
+    def _get_chunks_generator(self) -> Generator:
         # Returns a generator of chunks from the motctl file lines.
-        with open(ANGLES_FILE_PATH, "r", encoding="utf-8") as f:
+        with open("data/output.motctl", "r", encoding="utf-8") as f:
             content = f.read()
             chunks = list(filter(lambda x: bool(x.strip()), re.split(
                 r"(^&\d+\n)",  # Of the form '&12345'
@@ -165,27 +174,33 @@ class MovePage(Page):
                 flags=re.MULTILINE
             )))
 
-            print("chunks: ", chunks)
+            print("chunks: ", chunks)  # TODO REMOVE
             yield from chunks
 
     def _preview_motctl(self):
+        # When user clicks preview button
         if self._preview_started:
             print("Could not start preview. Preview already started.")
             return
 
-        self._chunks_gen = self._chunks_generator()
-        self._preview_started = True
+        self._chunks_gen = self._get_chunks_generator()
+        for chunk in self._chunks_gen:
+            for line in chunk.splitlines():
+                if line[0] != "@":
+                    continue
 
-        self._arduino_ser.send_data(
-            data="READY TO MOVE",
-            response_map={
-                "REQUEST NEXT CHUNK": self._send_next_chunk
-            }
-        )
+                angles = [steps_to_deg(int(a)) for a in line[1::].split(" ")]
+                angles = dict(zip(list("xyza"), angles))
+                print(angles)
+                self._update_angles(angles)
+                time.sleep(0.2)
+
+        return
+        self._preview_started = True
+        self._send_next_chunk()
 
     def _send_next_chunk(self):
         # Send the next chunk and begin waiting for the end response.
-
         if self._chunks_gen is None:
             print("No more chunks to send.")
             return
@@ -194,14 +209,13 @@ class MovePage(Page):
             self._arduino_ser.send_data(
                 data=next(self._chunks_gen),
                 response_map={
-                    "REQUEST NEXT CHUNK": self._send_next_chunk,
-                    "REQUEST CHUNK DATA": self._send_next_chunk,
-                    "DONE": self._stop
+                    "NEXT CHUNK": self._send_next_chunk,
+                    "MEMORY ALLOCATED": self._send_next_chunk,
+                    "DONE": self._stop,
                 }
             )
         except StopIteration:
             print("No more chunks to send.")
-            # TODO clean up
 
     def _go(self):
         self._is_moving = True
@@ -214,7 +228,6 @@ class MovePage(Page):
     def _stop(self):
         self._is_moving = False
         self._chunks_gen = None
-        self._current_preview_index = 0
         self._arduino_ser.stop_all_motors()
 
     def _view(self) -> None:

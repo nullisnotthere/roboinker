@@ -127,7 +127,7 @@ def _retrieve_new_cookie() -> str | None:
     options.set_preference("dom.prompt.testing.allow", True)
 
     # Don't show the browser GUI
-    options.add_argument("--headless")
+    #options.add_argument("--headless")
 
     # Initialise driver
     driver = webdriver.Firefox(options=options)

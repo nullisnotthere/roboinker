@@ -87,7 +87,8 @@ def main() -> None:
             move_page
         )
     }
-    active_page = pages["#move_tab"]
+    active_page = pages["#move_tab"]  # Open to this page initially
+    #active_page = list(pages.values())[0]
 
     for page_id, page in pages.items():
         tab_container.add_tab(page.tab_title, page_id)

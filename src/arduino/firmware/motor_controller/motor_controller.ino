@@ -1,7 +1,7 @@
 #include <math.h>
 #include <AccelStepper.h>
 
-// Define the pins for each axis
+// Pin Definitions
 #define DIR_PIN_X 5
 #define STEP_PIN_X 2
 #define DIR_PIN_Y 6
@@ -11,311 +11,318 @@
 #define DIR_PIN_A 13
 #define STEP_PIN_A 12
 
-const int STEPS_PER_REV = 200;      // 200 steps per revolution
-const int MAX_SPEED = 100;          // Steps/sec
-const int ACCEL = 3000;             // Steps/sec^2
-const float DEG_PER_STEP = 1.8f;    // Each step is 1.8° (360/200=1.8)
+// Motion Parameters
+const int STEPS_PER_REV = 200;
+const int MAX_SPEED = 100;
+const int ACCEL = 3000;
+const float DEG_PER_STEP = 1.8f;
 const float GEAR_RATIO = 256.0f / 9.0f;
 
-// MOTCTL language delimeters
+// Movement Flags
+const bool ENABLE_RELATIVE_MOVE = false;
+bool xReached = false, yReached = false, zReached = false, aReached = false;
 
+// Stepper Motors
+AccelStepper stepperX(AccelStepper::DRIVER, STEP_PIN_X, DIR_PIN_X);
+AccelStepper stepperY(AccelStepper::DRIVER, STEP_PIN_Y, DIR_PIN_Y);
+AccelStepper stepperZ(AccelStepper::DRIVER, STEP_PIN_Z, DIR_PIN_Z);
+AccelStepper stepperA(AccelStepper::DRIVER, STEP_PIN_A, DIR_PIN_A);
+AccelStepper* armSteppers[4] = { &stepperX, &stepperY, &stepperZ, &stepperA };
+
+// Serial Buffer
 const byte bufferSize = 128;
 char inputBuffer[bufferSize];
 byte bufferIndex = 0;
 bool lineComplete = false;
 
-// Should the motors move relative to the last position?
-// Usually would want this off
-const bool ENABLE_RELATIVE_MOVE = false;
-
-bool hasStarted = false; // Have we started moving yet?
-
-bool xReached = false;
-bool yReached = false;
-bool zReached = false;
-bool aReached = false;
-
-// Create AccelStepper instances for each axis
-AccelStepper stepperX(AccelStepper::DRIVER, STEP_PIN_X, DIR_PIN_X);
-AccelStepper stepperY(AccelStepper::DRIVER, STEP_PIN_Y, DIR_PIN_Y);
-AccelStepper stepperZ(AccelStepper::DRIVER, STEP_PIN_Z, DIR_PIN_Z);
-AccelStepper stepperA(AccelStepper::DRIVER, STEP_PIN_A, DIR_PIN_A);
-
-AccelStepper* armSteppers[4] = {&stepperX, &stepperY, &stepperZ, &stepperA};
-
-char** chunkBuffer = nullptr;
-int chunkSize = 0;
-int currentLineIndex = 0;
+// Chunk Buffer
+char* chunkBuffer = nullptr;
+int chunkBufferSize = 0;   // total allocated size
+int chunkBufferUsed = 0;   // how many chars currently filled
+bool inChunk = false;
 bool chunkAllocated = false;
 bool chunkFilled = false;
 
-int calculateSteps(float angle) {
-    /* Calculates the number of steps required
-     * to move by an angle in degrees */
-    return round((angle / DEG_PER_STEP) * GEAR_RATIO);
-}
-
-void allocateChunkBuffer(int lines) {
-    if (chunkBuffer != nullptr) {
-        // Clean up existing buffer
-        for (int i = 0; i < chunkSize; i++) {
-            free(chunkBuffer[i]);
-        }
-        free(chunkBuffer);
-    }
-
-    chunkSize = lines;
-    chunkBuffer = (char**)malloc(chunkSize * sizeof(char*));
-    for (int i = 0; i < chunkSize; i++) {
-        chunkBuffer[i] = (char*)malloc(bufferSize); // assume line <= bufferSize
-        chunkBuffer[i][0] = '\0';
-    }
-
-    currentLineIndex = 0;
-}
 
 void setup() {
     Serial.begin(9600);
 
-    // Set default max and initial speed for each motor
     for (AccelStepper* stepper : armSteppers) {
         stepper->setMaxSpeed(MAX_SPEED);
         stepper->setSpeed(MAX_SPEED);
+        stepper->setAcceleration(ACCEL);
+        stepper->moveTo(0);
     }
 
     stepperX.setMaxSpeed(80);
-    stepperX.setAcceleration(ACCEL);
-
     stepperY.setMaxSpeed(150);
-    stepperY.setAcceleration(ACCEL);
-
     stepperZ.setMaxSpeed(80);
-    stepperZ.setAcceleration(ACCEL);
-
     stepperA.setMaxSpeed(250);
-    stepperA.setAcceleration(ACCEL);
-
-    stepperX.moveTo(0);
-    stepperY.moveTo(0);
-    stepperZ.moveTo(0);
-    stepperA.moveTo(0);
 
     Serial.flush();
 }
 
-void checkMotorPositions() {
-    // Check is the target positions are reached,
-    // if they are, zero (home) the position.
-    // Otherwise, run the motors until target position is reached.
-
-    if (abs(stepperX.distanceToGo()) <= 0) {
-        if (ENABLE_RELATIVE_MOVE) stepperX.setCurrentPosition(0);
-        xReached = true;
-    } else {
-        stepperX.run();
+// Memory Management
+void allocateChunkBuffer(int memSize) {
+    if (chunkBuffer != nullptr) {
+        free(chunkBuffer);
     }
 
-    if (abs(stepperY.distanceToGo()) <= 0) {
-        if (ENABLE_RELATIVE_MOVE) stepperY.setCurrentPosition(0);
-        yReached = true;
+    chunkBuffer = (char*)malloc(memSize);
+    if (chunkBuffer) {
+        chunkBuffer[0] = '\0';   // empty string
+        chunkBufferSize = memSize;
+        chunkBufferUsed = 0;
+        chunkAllocated = true;
+        chunkFilled = false;
     } else {
-        stepperY.run();
-    }
-
-    if (abs(stepperZ.distanceToGo()) <= 0) {
-        if (ENABLE_RELATIVE_MOVE) stepperZ.setCurrentPosition(0);
-        zReached = true;
-    } else {
-        stepperZ.run();
-    }
-
-    if (abs(stepperA.distanceToGo()) <= 0) {
-        if (ENABLE_RELATIVE_MOVE) stepperA.setCurrentPosition(0);
-        aReached = true;
-    } else {
-        stepperA.run();
+        chunkAllocated = false;
+        Serial.println("ERROR: Allocation failed");
     }
 }
 
-bool handleLine(char* line) {
-    line[strcspn(line, "\r\n")] = 0;  // Trim trailing newline
+void fillChunk(const char* line) {
+    if (!chunkAllocated || !chunkBuffer) return;
 
-    if (strstr(line, "ASK READY")) {
-        Serial.println("ARDUINO IS READY");
-    } else if (line[0] == '@') {
-        char axis;
-        float value; // The angle
-        char floatStr[16];
+    int len = strlen(line);
 
-        if (sscanf(line, "@%ld %ld %ld %ld", &target.steps[0], &target.steps[1], &target.steps[2], &target.steps[3]) == 4) {
-            value = atof(floatStr);
+    // +2 = 1 for '\n', 1 for '\0'
+    if (chunkBufferUsed + len + 2 >= chunkBufferSize) {
+        Serial.println("ERROR: Chunk buffer overflow");
+        return;
+    }
 
-            int stepValue = calculateSteps(value);
-            //float targetTime = 4.0f;
-            //float speed = 0.0f;
-            hasStarted = true;
+    // Copy line into buffer
+    memcpy(chunkBuffer + chunkBufferUsed, line, len);
+    chunkBufferUsed += len;
 
-            switch (axis) {
-                case 'x':
-                    stepperX.moveTo(stepValue);
-                    break;
-                case 'y':
-                    stepperY.moveTo(stepValue);
-                    break;
-                case 'z':
-                    stepperZ.moveTo(stepValue);
-                    break;
-                case 'a':
-                    stepperA.moveTo(stepValue);
-                    break;
-                default:
-                    hasStarted = false;
-                    break;
-            }
+    // Append '\n'
+    chunkBuffer[chunkBufferUsed++] = '\n';
+    chunkBuffer[chunkBufferUsed] = '\0';
 
-            Serial.println(value);
+    chunkFilled = true;  // mark as having data
+}
 
-        } else {
+void freeChunkBuffer() {
+    if (chunkBuffer != nullptr) {
+        free(chunkBuffer);
+        chunkBuffer = nullptr;
+    }
+
+    chunkBufferSize = 0;
+    chunkBufferUsed = 0;
+    chunkAllocated = false;
+    chunkFilled = false;
+}
+
+// Stepper Update
+void updateMotorPositions() {
+    if (abs(stepperX.distanceToGo()) <= 0) {
+        if (ENABLE_RELATIVE_MOVE) {
+            stepperX.setCurrentPosition(0);
         }
-    } else if (strstr(line, "STOP")) {
-        //Serial.println("EMERGENCY STOP!");
-        stepperX.setSpeed(0);
-        stepperY.setSpeed(0);
-        stepperZ.setSpeed(0);
-        stepperA.setSpeed(0);
-    } else if (strstr(line, "SET ORIGIN")) {
-        //Serial.println("ORIGIN SET");
-        stepperX.setCurrentPosition(0);
-        stepperY.setCurrentPosition(0);
-        stepperZ.setCurrentPosition(0);
-        stepperA.setCurrentPosition(0);
-    } else if (strstr(line, "IS REACHED")) {
-        bool isReached = hasStarted && xReached && yReached && zReached && aReached;
-        Serial.print(isReached ? "#TRUE#" : "#FALSE#");
-    } else if (strstr(line, "READY TO MOVE")) {
-        Serial.println("REQUEST NEXT CHUNK");
-    } else if (line[0] == '^') {
-        if (chunkAllocated && !chunkFilled) {
-            Serial.println("RECEIVED CHUNK DATA");
-            fillChunk();
+        xReached = true;
+    } else stepperX.run();
+    if (abs(stepperY.distanceToGo()) <= 0) {
+        if (ENABLE_RELATIVE_MOVE) {
+            stepperY.setCurrentPosition(0);
+        }
+        yReached = true;
+    } else stepperY.run();
+    if (abs(stepperZ.distanceToGo()) <= 0) {
+        if (ENABLE_RELATIVE_MOVE) {
+            stepperZ.setCurrentPosition(0);
+        }
+        zReached = true;
+    } else stepperZ.run();
+    if (abs(stepperA.distanceToGo()) <= 0) {
+        if (ENABLE_RELATIVE_MOVE) {
+            stepperA.setCurrentPosition(0);
+        }
+        aReached = true;
+    } else stepperA.run();
+}
+
+// Chunk Line Handler
+void handleChunkLine(char* line) {
+    line[strcspn(line, "\r\n")] = 0;
+
+    if (strcmp(line, "DONE") == 0) {
+        Serial.println("ALL CHUNKS DONE");
+        freeChunkBuffer();
+    }
+    else if (strncmp(line, "@", 1) == 0) {
+        int xValue, yValue, zValue, aValue;
+        if (sscanf(line, "@%d %d %d %d", &xValue, &yValue, &zValue, &aValue) == 4) {
+            xReached = yReached = zReached = aReached = false;
+            stepperX.moveTo(xValue);
+            stepperY.moveTo(yValue);
+            stepperZ.moveTo(zValue);
+            stepperA.moveTo(aValue);
+
+            // Update until they reach positions
+            while (!(xReached && yReached && zReached && aReached)) {
+                updateMotorPositions();
+            }
+            Serial.println("Finished moving");
+        } else {
+            Serial.println("ERROR ANGLES OF WRONG FORMAT");
+        }
+    }
+    else if (strstr(line, "SET ORIGIN")) {
+        // Mark current point for all steppers as zero point
+        for (AccelStepper* stepper : armSteppers) {
+            stepper->setCurrentPosition(0);
+        }
+        Serial.println("Origin set");
+    }
+    else if (strstr(line, "END CHUNK$")) {
+        inChunk = false;
+        Serial.println("NEXT CHUNK");
+    }
+    else {
+        // Unhandled
+        Serial.print("UNKNOWN IN-CHUNK CMD: ");
+        Serial.println(line);
+    }
+}
+
+// Non-chunk Commands
+void handleNonChunkLine(char* line) {
+    // Receiving chunk data as input
+    if (strncmp("START CHUNK", line, 11) == 0) {
+        if (chunkAllocated) {
+            inChunk = true;
+            fillChunk(line);
         } else {
             Serial.println("RECEIVED CHUNK DATA BUT NO MEMORY WAS ALLOCATED");
         }
-    } else if (line[0] == '&') {
-        // Allocate memory request (start of chunk)
-        char cmdChar;
+        return;
+    }
+
+    // Strip line if its not chunk data, because chunk data is newline delimited
+    line[strcspn(line, "\r\n")] = 0;
+
+    if (strstr(line, "ASK READY")) {
+        Serial.println("READY");
+    }
+    else if (strstr(line, "STOP")) {
+        for (AccelStepper* stepper : armSteppers)
+            stepper->setSpeed(0);
+    }
+    else if (line[0] == '&') {
         int value;
         if (sscanf(line, "&%d", &value) == 1) {
             allocateChunkBuffer(value);
-            chunkAllocated = true;
-            // Request the actual data to fill the chunk with
-            Serial.println("REQUEST CHUNK DATA");
+            Serial.println("MEMORY ALLOCATED");
+        } else {
+            Serial.println("MEMORY COULD NOT BE ALLOCATED INVALID FORMAT");
         }
-    } else if (!handleInstructionLine) {
-        Serial.print("UNHANDLED CMD: ");
+    }
+    else {
+        // Unhandled
+        Serial.print("UNHANDLED NON-CHUNK LINE: ");
         Serial.println(line);
-    } else {
-        return false;  // Unhandled
     }
-    return true;
 }
 
-void handleLine(char* line, bool inChunk = false) {
-    // Handle a line from serial
-    bool instructionsHandled = handleInstructionLine(line);
-    if (inChunk) {
-        if (!instructionsHandled) {
-            Serial.print("UNHANDLED CMD: ");
-            Serial.println(line);
-        }
-    }
-
-}
-
+// Serial Input Handler
+// Check if the first 11 characters read are START CHUNK, that means we're in a
+// chunk so we'll keep reading until '$' character and send it all to
+// handleNonChunkLine as one line (where it gets allocated and parsed).
+// BUT!!! if the line starts with ^ handle that line with handleChunkLine!!!
+// This is so that we can send individual commands too without needing to
+// allocate new memory every time.
 void handleSerial() {
-    // Non-blocking read while serial is available
+    static bool readingChunk = false; // Track if we're inside START CHUNK
+    static int charCount = 0;         // Track how many chars read so far
+
     while (Serial.available() > 0) {
-        // Read one byte
         char c = Serial.read();
 
-        // If it's the line delimeter character
-        if (c == '\n' || c == '\r') {
-            if (bufferIndex > 0) {
-                // End the input buffer
-                inputBuffer[bufferIndex] = '\0';
-                bufferIndex = 0;
-                lineComplete = true;
-            }
-        } else if (bufferIndex < bufferSize - 1) {
-            // Add char to the input buffer
+        // Always append unless buffer is full
+        if (bufferIndex < bufferSize - 1) {
             inputBuffer[bufferIndex++] = c;
         }
 
-        if (lineComplete) {
-            handleLine(inputBuffer);
-            lineComplete = false;
-        }
-    }
-}
-
-void fillChunk() {
-    char lineBuffer[bufferSize];
-    int lineIndex = 0;
-
-    while (Serial.available() > 0) {
-        char c = Serial.read();
-
-        // End of chunk marker
-        if (c == '$') {
-            break;
-        }
-
-        // Newline marks end of line
-        if (c == '\n' || c == '\r') {
-            if (lineIndex > 0) {
-                lineBuffer[lineIndex] = '\0';
-
-                // Ensure we havespace
-                if (currentLineIndex < chunkSize) {
-                    strncpy(chunkBuffer[currentLineIndex], lineBuffer, bufferSize - 1);
-                    chunkBuffer[currentLineIndex][bufferSize - 1] = '\0';
-                    currentLineIndex++;
-                }
-                lineIndex = 0; // Reset for next line
+        // Count characters until 11 so we can check START CHUNK prefix
+        if (charCount < 11) {
+            charCount++;
+            if (charCount == 11 && strncmp(inputBuffer, "START CHUNK", 11) == 0) {
+                readingChunk = true; // We now know we're reading a chunk
             }
-        } else if (lineIndex < bufferSize - 1) {
-            lineBuffer[lineIndex++] = c;
+        }
+
+        if (readingChunk) {
+            // If we see '$', the chunk ends
+            if (c == '$') {
+                inputBuffer[bufferIndex] = '\0';
+                handleNonChunkLine(inputBuffer); // includes the $
+                bufferIndex = 0;
+                charCount = 0;
+                readingChunk = false;
+            }
+        } else {
+            // Normal mode: newline ends the command
+            if (c == '\n' || c == '\r') {
+                if (bufferIndex > 1) { // Ignore empty lines
+                    inputBuffer[bufferIndex - 1] = '\0'; // Remove newline
+
+                    // Case 1: standalone chunk-style line starting with ^
+                    if (inputBuffer[0] == '^') {
+                        handleChunkLine(&inputBuffer[1]); // exclude '^'
+                    }
+                    // Case 2: normal non-chunk line
+                    else {
+                        handleNonChunkLine(inputBuffer);
+                    }
+                }
+                bufferIndex = 0;
+                charCount = 0;
+            }
         }
     }
-    chunkFilled = true;
 }
 
-void handleChunk() {
-    // Reset flags before move
-    xReached = false;
-    yReached = false;
-    zReached = false;
-    aReached = false;
-    hasStarted = false;
+// Chunk Executor
+void parseCurrentChunk() {
+    if (!chunkFilled || !chunkBuffer) return;
 
-    for (int i = 0; i < chunkSize; ++i) {
-        if (chunkBuffer[i][0] != '\0') {
-            handleLine(chunkBuffer[i+1], true);
+    char line[bufferSize];
+    int linePos = 0;
+    int lineCounter = 0;
+
+    for (int i = 0; chunkBuffer[i] != '\0'; i++) {
+        if (chunkBuffer[i] == '\n') {
+            line[linePos] = '\0'; // terminate string
+            if (linePos > 0) {
+                handleChunkLine(line);
+                lineCounter++;
+            }
+            linePos = 0; // reset for next line
+        } else {
+            if (linePos < bufferSize - 1) {
+                line[linePos++] = chunkBuffer[i];
+            }
         }
     }
+    Serial.println(lineCounter);
 
-    while (!(xReached && yReached && zReached && aReached)) {
-        checkMotorPositions();
+    // If last line doesn’t end with \n
+    if (linePos > 0) {
+        line[linePos] = '\0';
+        handleChunkLine(line);
     }
-    // MAKE IT MOVE ALL MOTORS AT ONCE NOT JUST FIRST LINE
-    currentLineIndex = 0;
+
+    chunkFilled = false; // done parsing
 }
 
+// Main Loop
 void loop() {
     if (chunkAllocated && chunkFilled) {
-        handleChunk();
-        chunkFilled = false;
+        parseCurrentChunk();
     } else {
         handleSerial();
     }
 }
+

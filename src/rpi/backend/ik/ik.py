@@ -147,3 +147,22 @@ def plot_arm(base, arm1, arm2, x, y, z):
     plt.title("Robotic Arm Configuration")
     plt.grid()
     plt.show()
+
+
+def deg_to_steps(
+        angle: float,
+        steps_per_rev: float = 200,
+        gear_ratio: float = 256.0 / 9.0) -> int:
+    """Converts degrees to NEMA 17 motor steps."""
+    deg_per_step = 360.0 / steps_per_rev
+    return round((angle / deg_per_step) * gear_ratio)
+
+
+def steps_to_deg(
+        steps: int,
+        steps_per_rev: float = 200,
+        gear_ratio: float = 256.0 / 9.0) -> float:
+    """Converts NEMA 17 motor steps to degrees."""
+    deg_per_step = 360.0 / steps_per_rev
+    return steps * deg_per_step / gear_ratio
+
