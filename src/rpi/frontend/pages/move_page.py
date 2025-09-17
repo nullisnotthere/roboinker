@@ -31,9 +31,10 @@ from src.rpi.backend.constants import (
     BASE_HEIGHT,
     PEN_ARM_LEN,
     PEN_LEN,
+)
+from src.rpi.frontend.constants import (
     BASE_SCREEN_OFFSET,
     DRAG_ARM_HITBOX_SIZE,
-    ANGLES_FILE_PATH
 )
 
 
@@ -57,14 +58,17 @@ class MovePage(Page):
         self._is_moving = False
 
         self._motor_angles: dict[str, float] = {"x": 0, "y": 0, "z": 0, "a": 0}
-        self._chunks_gen: Generator[str] | None = None
+        self._chunks_gen: Generator[str] | None | list = None
+        self._line_index = 0
         self._preview_started = False
 
         self._arduino_ser = arduino_ser
+        """
         self._arduino_ser.send_data(
             "ASK READY",
             {"READY": lambda: print("We're ready!")}
         )
+        """
 
         # Initialise the UI elements
         self._top_frame = pygame_gui.elements.UIPanel(
@@ -164,9 +168,10 @@ class MovePage(Page):
             command=self._preview_motctl
         )
 
-    def _get_chunks_generator(self) -> Generator:
+    def _get_chunks_generator(self) -> Generator | list:
         # Returns a generator of chunks from the motctl file lines.
         with open("data/output.motctl", "r", encoding="utf-8") as f:
+            #return f.readlines()
             content = f.read()
             chunks = list(filter(lambda x: bool(x.strip()), re.split(
                 r"(^&\d+\n)",  # Of the form '&12345'
@@ -184,18 +189,6 @@ class MovePage(Page):
             return
 
         self._chunks_gen = self._get_chunks_generator()
-        for chunk in self._chunks_gen:
-            for line in chunk.splitlines():
-                if line[0] != "@":
-                    continue
-
-                angles = [steps_to_deg(int(a)) for a in line[1::].split(" ")]
-                angles = dict(zip(list("xyza"), angles))
-                print(angles)
-                self._update_angles(angles)
-                time.sleep(0.2)
-
-        return
         self._preview_started = True
         self._send_next_chunk()
 
@@ -228,7 +221,7 @@ class MovePage(Page):
     def _stop(self):
         self._is_moving = False
         self._chunks_gen = None
-        self._arduino_ser.stop_all_motors()
+        self._arduino_ser.send_data("^STOP")
 
     def _view(self) -> None:
         # Sets the arm's angles to the value in the entries and updates
@@ -343,6 +336,22 @@ class MovePage(Page):
         self._y_angle_hitbox = _get_mouse_hitbox(y_line_end, 50, self.surface)
         pygame.draw.line(self.surface, GREEN, y_angle_origin, y_line_end, 7)
         pygame.draw.circle(self.surface, ORANGE, y_line_end, 10)
+
+        """
+        if self._preview_started and self._chunks_gen is not None:
+            if self._line_index >= len(self._chunks_gen):
+                self._line_index = 0
+                self._preview_started = False
+                return
+            line = self._chunks_gen[self._line_index]
+            if line[0] == "@":
+                angles = [steps_to_deg(int(a)) for a in line[1::].split(" ")]
+                angles = dict(zip(list("xyza"), angles))
+                print(angles)
+                self._update_angles(angles)
+                time.sleep(0.1)
+            self._line_index += 1
+        """
 
 
 def _screen_to_world_coords(screen_x: int, screen_y: int):

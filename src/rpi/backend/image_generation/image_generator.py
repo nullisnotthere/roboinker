@@ -5,40 +5,53 @@ import numpy as np
 import cv2
 
 from cv2.typing import MatLike
-from src.rpi.backend.image_generation.bingart import BingArt
+from src.rpi.backend.image_generation.bingart import BingArt, AuthCookieError
+from src.rpi.backend.image_generation.bing_token_retriever import (
+    get_token,
+    retrieve_new_cookie
+)
 
 BING_URL = "https://www.bing.com"
 
 
-def generate_images(prompt: str, u_token: str) -> list[MatLike] | None:
+def generate_images(prompt: str, u_token: str | None) -> list[MatLike] | None:
     """
     Generates images using Bing AI and returns a list of OpenCV images.
     Source: https://github.com/DedInc/bingart/tree/main
     """
 
-    bing_art = BingArt(auth_cookie_U=u_token)
+    while True:
+        try:
+            bing_art = BingArt(auth_cookie_U=u_token)
+            results = bing_art.generate_images(prompt)
 
-    try:
-        results = bing_art.generate_images(prompt)
+            # Return the extracted OpenCV images
+            cv_images = []
+            images = results.get("images")
 
-        # Return the extracted OpenCV images
-        cv_images = []
-        images = results.get("images")
+            if images is None:
+                return None
 
-        if images is None:
-            return None
-
-        # Extact URLs from BingAI data
-        urls = {img.get("url") for img in images if img.get("url")}
-        for url in urls:
-            # Get the images at those URLs
-            cv_img = _extract_image(url)
-            if cv_img is None:
-                continue
-            cv_images.append(cv_img)
-        return cv_images
-    finally:
-        bing_art.close_session()
+            # Extact URLs from BingAI data
+            urls = {img.get("url") for img in images if img.get("url")}
+            for url in urls:
+                # Get the images at those URLs
+                cv_img = _extract_image(url)
+                if cv_img is None:
+                    continue
+                cv_images.append(cv_img)
+            return cv_images
+        except AuthCookieError:
+            print(
+                "AuthCookieError! You may be rate limited or there is "
+                "an internal server error."
+            )
+            u_token = retrieve_new_cookie()
+            if u_token is None:
+                print("Failed to retrieve new cookie.")
+                return None
+        finally:
+            bing_art.close_session()
 
 
 def _extract_image(image_url) -> MatLike | None:

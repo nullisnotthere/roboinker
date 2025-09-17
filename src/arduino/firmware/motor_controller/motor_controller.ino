@@ -29,13 +29,12 @@ AccelStepper stepperZ(AccelStepper::DRIVER, STEP_PIN_Z, DIR_PIN_Z);
 AccelStepper stepperA(AccelStepper::DRIVER, STEP_PIN_A, DIR_PIN_A);
 AccelStepper* armSteppers[4] = { &stepperX, &stepperY, &stepperZ, &stepperA };
 
-// Serial Buffer
-const byte bufferSize = 128;
-char inputBuffer[bufferSize];
+// Serial line buffer
+const byte lineBufferSize = 128;
+char lineBuffer[lineBufferSize];
 byte bufferIndex = 0;
-bool lineComplete = false;
 
-// Chunk Buffer
+// Chunk buffer
 char* chunkBuffer = nullptr;
 int chunkBufferSize = 0;   // total allocated size
 int chunkBufferUsed = 0;   // how many chars currently filled
@@ -70,11 +69,15 @@ void allocateChunkBuffer(int memSize) {
 
     chunkBuffer = (char*)malloc(memSize);
     if (chunkBuffer) {
-        chunkBuffer[0] = '\0';   // empty string
+        chunkBuffer[0] = '\0';   // Empty the string
         chunkBufferSize = memSize;
         chunkBufferUsed = 0;
         chunkAllocated = true;
         chunkFilled = false;
+        inChunk = false;
+        Serial.print("Allocated: ");
+        Serial.print(memSize);
+        Serial.println(" bytes");
     } else {
         chunkAllocated = false;
         Serial.println("ERROR: Allocation failed");
@@ -101,6 +104,7 @@ void fillChunk(const char* line) {
     chunkBuffer[chunkBufferUsed] = '\0';
 
     chunkFilled = true;  // mark as having data
+    inChunk = true;
 }
 
 void freeChunkBuffer() {
@@ -147,6 +151,9 @@ void updateMotorPositions() {
 void handleChunkLine(char* line) {
     line[strcspn(line, "\r\n")] = 0;
 
+    Serial.print("line: ");
+    Serial.println(line);
+
     if (strcmp(line, "DONE") == 0) {
         Serial.println("ALL CHUNKS DONE");
         freeChunkBuffer();
@@ -159,6 +166,9 @@ void handleChunkLine(char* line) {
             stepperY.moveTo(yValue);
             stepperZ.moveTo(zValue);
             stepperA.moveTo(aValue);
+
+            Serial.print("dx to go: ");
+            Serial.println(stepperX.distanceToGo());
 
             // Update until they reach positions
             while (!(xReached && yReached && zReached && aReached)) {
@@ -176,39 +186,9 @@ void handleChunkLine(char* line) {
         }
         Serial.println("Origin set");
     }
-    else if (strstr(line, "END CHUNK$")) {
+    else if (strstr(line, "$")) {
         inChunk = false;
         Serial.println("NEXT CHUNK");
-    }
-    else {
-        // Unhandled
-        Serial.print("UNKNOWN IN-CHUNK CMD: ");
-        Serial.println(line);
-    }
-}
-
-// Non-chunk Commands
-void handleNonChunkLine(char* line) {
-    // Receiving chunk data as input
-    if (strncmp("START CHUNK", line, 11) == 0) {
-        if (chunkAllocated) {
-            inChunk = true;
-            fillChunk(line);
-        } else {
-            Serial.println("RECEIVED CHUNK DATA BUT NO MEMORY WAS ALLOCATED");
-        }
-        return;
-    }
-
-    // Strip line if its not chunk data, because chunk data is newline delimited
-    line[strcspn(line, "\r\n")] = 0;
-
-    if (strstr(line, "ASK READY")) {
-        Serial.println("READY");
-    }
-    else if (strstr(line, "STOP")) {
-        for (AccelStepper* stepper : armSteppers)
-            stepper->setSpeed(0);
     }
     else if (line[0] == '&') {
         int value;
@@ -219,102 +199,132 @@ void handleNonChunkLine(char* line) {
             Serial.println("MEMORY COULD NOT BE ALLOCATED INVALID FORMAT");
         }
     }
+    else if (strstr(line, "ASK READY")) {
+        Serial.println("READY");
+    }
+    else if (strstr(line, "STOP")) {
+        for (AccelStepper* stepper : armSteppers)
+            stepper->setSpeed(0);
+    }
     else {
         // Unhandled
-        Serial.print("UNHANDLED NON-CHUNK LINE: ");
+        Serial.print("UNKNOWN CMD: ");
         Serial.println(line);
     }
 }
 
-// Serial Input Handler
-// Check if the first 11 characters read are START CHUNK, that means we're in a
-// chunk so we'll keep reading until '$' character and send it all to
-// handleNonChunkLine as one line (where it gets allocated and parsed).
-// BUT!!! if the line starts with ^ handle that line with handleChunkLine!!!
-// This is so that we can send individual commands too without needing to
-// allocate new memory every time.
 void handleSerial() {
-    static bool readingChunk = false; // Track if we're inside START CHUNK
-    static int charCount = 0;         // Track how many chars read so far
+    // Non-blocking serial parser with three modes:
+    // 1) writingChunk: between '^' and '$' -> append to chunkBuffer (inclusive) if allocated.
+    // 2) readingStarLine: line starting with '*' -> collect into 128B temp, pass to handleChunkLine (without '*').
+    // 3) default line: collect into 128B temp, pass to handleChunkLine on EOL.
+    static bool writingChunk = false;
+    static bool readingStarLine = false;
+    static char lineBuf[128];
+    static int  lineLen = 0;
 
     while (Serial.available() > 0) {
-        char c = Serial.read();
+        char c = (char)Serial.read();
 
-        // Always append unless buffer is full
-        if (bufferIndex < bufferSize - 1) {
-            inputBuffer[bufferIndex++] = c;
-        }
-
-        // Count characters until 11 so we can check START CHUNK prefix
-        if (charCount < 11) {
-            charCount++;
-            if (charCount == 11 && strncmp(inputBuffer, "START CHUNK", 11) == 0) {
-                readingChunk = true; // We now know we're reading a chunk
-            }
-        }
-
-        if (readingChunk) {
-            // If we see '$', the chunk ends
-            if (c == '$') {
-                inputBuffer[bufferIndex] = '\0';
-                handleNonChunkLine(inputBuffer); // includes the $
-                bufferIndex = 0;
-                charCount = 0;
-                readingChunk = false;
-            }
-        } else {
-            // Normal mode: newline ends the command
-            if (c == '\n' || c == '\r') {
-                if (bufferIndex > 1) { // Ignore empty lines
-                    inputBuffer[bufferIndex - 1] = '\0'; // Remove newline
-
-                    // Case 1: standalone chunk-style line starting with ^
-                    if (inputBuffer[0] == '^') {
-                        handleChunkLine(&inputBuffer[1]); // exclude '^'
-                    }
-                    // Case 2: normal non-chunk line
-                    else {
-                        handleNonChunkLine(inputBuffer);
-                    }
+        // Mode 1: inside a ^...$ chunk
+        if (writingChunk) {
+            if (chunkAllocated && chunkBuffer != nullptr && chunkBufferSize > 0) {
+                if (chunkBufferUsed < (chunkBufferSize - 1)) {
+                    chunkBuffer[chunkBufferUsed++] = c;   // store every byte (incl. newlines, '$')
+                    chunkBuffer[chunkBufferUsed] = '\0';  // keep null-terminated
                 }
-                bufferIndex = 0;
-                charCount = 0;
+                // else: drop overflow but keep scanning until '$'
             }
+            if (c == '$') {
+                writingChunk = false;
+                if (chunkAllocated && chunkBuffer != nullptr) {
+                    chunkFilled = true; // ready for parseCurrentChunk()
+                }
+            }
+            continue; // do not treat chunk bytes as command lines
         }
+
+        // Not inside chunk yet: check for '^' to start
+        if (c == '^') {
+            writingChunk = true;
+            if (chunkAllocated && chunkBuffer != nullptr && chunkBufferSize > 0) {
+                // start fresh and include '^'
+                chunkBufferUsed = 0;
+                chunkBuffer[chunkBufferUsed++] = '^';
+                chunkBuffer[chunkBufferUsed] = '\0';
+            }
+            continue; // keep reading following bytes as chunk content
+        }
+
+        // Star-led single-line command (exclude '*' itself)
+        if (c == '*') {
+            readingStarLine = true;
+            lineLen = 0;
+            continue;
+        }
+
+        // End-of-line => flush whichever line we're building
+        if (c == '\n' || c == '\r') {
+            if (lineLen > 0) {
+                lineBuf[lineLen] = '\0';
+                handleChunkLine(lineBuf); // for star lines, '*' was excluded above
+                lineLen = 0;
+                readingStarLine = false;
+            }
+            // Swallow CRLF pair non-blockingly
+            if (c == '\r' && Serial.peek() == '\n') (void)Serial.read();
+            continue;
+        }
+
+        // Regular character for current line (star or default)
+        if (lineLen < (int)sizeof(lineBuf) - 1) {
+            lineBuf[lineLen++] = c;
+        }
+        // else: truncate until EOL to remain safe and non-blocking
     }
 }
 
-// Chunk Executor
 void parseCurrentChunk() {
-    if (!chunkFilled || !chunkBuffer) return;
+    // Consume chunkBuffer line-by-line using a rotating 128-byte temp buffer.
+    if (!chunkAllocated || !chunkFilled || chunkBuffer == nullptr) return;
 
-    char line[bufferSize];
-    int linePos = 0;
-    int lineCounter = 0;
+    const char* p = chunkBuffer;
 
-    for (int i = 0; chunkBuffer[i] != '\0'; i++) {
-        if (chunkBuffer[i] == '\n') {
-            line[linePos] = '\0'; // terminate string
-            if (linePos > 0) {
-                handleChunkLine(line);
-                lineCounter++;
-            }
-            linePos = 0; // reset for next line
-        } else {
-            if (linePos < bufferSize - 1) {
-                line[linePos++] = chunkBuffer[i];
-            }
+    while (*p != '\0') {
+        // Allocate 128B temporary buffer for this line
+        char* tmp = (char*)malloc(128);
+        if (!tmp) {
+            // Allocation failed — abort parsing to avoid UB
+            return;
+        }
+        int idx = 0;
+
+        // Copy until EOL or NUL, truncating safely at 127 chars
+        while (*p != '\0' && *p != '\n' && *p != '\r') {
+            if (idx < 127) tmp[idx++] = *p;
+            ++p;
+        }
+        tmp[idx] = '\0';
+
+        if (idx > 0) {
+            handleChunkLine(tmp);
+        }
+
+        free(tmp);
+
+        // Skip EOL chars (CRLF/CR/LF)
+        if (*p == '\r') {
+            ++p;
+            if (*p == '\n') ++p;
+        } else if (*p == '\n') {
+            ++p;
         }
     }
-    Serial.println(lineCounter);
 
-    // If last line doesn’t end with \n
-    if (linePos > 0) {
-        line[linePos] = '\0';
-        handleChunkLine(line);
-    }
-
-    chunkFilled = false; // done parsing
+    // Mark chunk as consumed / ready for next write
+    chunkFilled = false;
+    chunkBufferUsed = 0;
+    if (chunkBuffer) chunkBuffer[0] = '\0';
 }
 
 // Main Loop

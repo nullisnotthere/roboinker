@@ -30,8 +30,7 @@ SMOOTHNESS_RANGE = (10, 90)
 def calculate_image_new_dimen(cv_img, arm_max_length) -> tuple[int, int]:
     """Returns the new width and height for an image given an arm maximum
     extension. This is the optimal image area within the arm's semicirclular
-    arc while maintaining the image's aspect ratio. The aspect ratio is
-    fixed by the Dream AI free plan, so we must compromise."""
+    arc while maintaining the image's aspect ratio."""
     img_h, img_w = cv_img.shape[:2]  # Height first, then width
     new_w, new_h = map(int, _max_rect_from_semi(img_w, img_h, arm_max_length))
     return new_w, new_h
@@ -39,7 +38,7 @@ def calculate_image_new_dimen(cv_img, arm_max_length) -> tuple[int, int]:
 
 def extract_contours(
         opencv_image,
-        arm_max_length,
+        new_dimensions,
         initial_detail_level: float | None = None):
     """Filter image and extract simplified and smooth contours using RDP and
     B-splines."""
@@ -53,8 +52,8 @@ def extract_contours(
     # First rotation (make landscape) for optimal semicircle coverage
     img = cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
 
-    # Resize image based on arm_max_length
-    img = cv2.resize(img, calculate_image_new_dimen(img, arm_max_length))
+    # Resize image
+    img = cv2.resize(img, new_dimensions)
 
     # This second rotation compensates for the screen Y coord corresponding to
     # the arm's X coord. IMPORTANT!!!
@@ -99,7 +98,7 @@ def extract_contours(
     # Find contours
     contours, _ = cv2.findContours(
         image=edges,
-        mode=cv2.RETR_EXTERNAL,
+        mode=cv2.RETR_TREE,
         method=cv2.CHAIN_APPROX_SIMPLE
     )
 
@@ -125,11 +124,8 @@ def extract_contours(
     )
 
 
-def sort_contours(contours):
+def sort_contours(contours: list):
     """Sort contours to minimize pen travel (greedy nearest neighbor)."""
-    if not contours:
-        return []
-
     sorted_contours = [contours.pop(0)]  # Start with first contour
     contour_index = 0
 
@@ -149,17 +145,34 @@ def sort_contours(contours):
 def save_motor_angles(
         contours,
         base, arm1, arm2, offset, pen_up_offset,
-        output_file="output.motctl",
+        output_file="data/output.motctl",
         scale=1.0) -> None:
     """
     Converts contours to motor angles to be interpreted by the robot arm's
     firmware.
     """
+
+    def make_cmd_line_from_point(x, y, z, scale):
+        angles = get_real_angles(px, py, pz, base, arm1, arm2)
+        if angles:
+            print(
+                f'@{angles["x"]} {angles["y"]} '
+                f'{angles["z"]} {angles["a"]}'
+            )
+            ax = deg_to_steps(angles["x"])
+            ay = deg_to_steps(angles["y"])
+            az = deg_to_steps(angles["z"])
+            aa = deg_to_steps(angles["a"])
+            line = f"@{ax} {ay} {az} {aa}"
+        else:
+            line = "NO ANGLES"
+        return line
+
+    chunks = []
+    chunk_lines = []
     with open(output_file, "w", encoding="utf-8") as f:
-        chunks = []
-        chunk_lines = []
         for contour_index, contour in enumerate(contours):
-            # Each chunk is ~10k characters
+            # Each chunk is ~10k characters max
             for point_index, point in enumerate(contour):
                 # When reading the first point of the contour, we must put
                 # the pen up first before moving it into position
@@ -167,18 +180,13 @@ def save_motor_angles(
 
                 px = (point[0] + offset[0]) * scale
                 py = (point[1] + offset[1]) * scale
-                pz = (offset[2] + (pen_up_offset if is_pen_up else 0)) * scale
+                pz = offset[2]  # No scale for z, must be constant
 
-                angles = get_real_angles(px, py, pz, base, arm1, arm2)
-                if angles:
-                    print(angles["y"])
-                    ax = deg_to_steps(angles["x"])
-                    ay = deg_to_steps(angles["y"])
-                    az = deg_to_steps(angles["z"])
-                    aa = deg_to_steps(angles["a"])
-                    line = f"@{ax} {ay} {az} {aa}"
-                else:
-                    line = "NO ANGLES"
+                # Duplicate the point as a pen up point
+                if is_pen_up:
+                    pzu = offset[2] + pen_up_offset  # Up
+                    pen_up_line = make_cmd_line_from_point(px, py, pzu, scale)
+                line = make_cmd_line_from_point(px, py, pz, scale)
 
                 # If we exceed 10k characters or we're on the last line
                 char_count = len("\n".join(chunk_lines))
@@ -192,8 +200,8 @@ def save_motor_angles(
                         or (contour_index == len(contours) - 1
                             and point_index == len(contour) - 1)):
                     # Mark memory, start, end
-                    chunk_lines.insert(0, "START CHUNK")
-                    chunk_lines.append("END CHUNK$")
+                    chunk_lines.insert(0, "^")
+                    chunk_lines.append("$")
 
                     mem_value = len("\n".join(chunk_lines)) + 1
                     chunk_lines.insert(0, f"&{mem_value}")
@@ -207,10 +215,39 @@ def save_motor_angles(
                     # Reset the buffer for the current line
                     chunk_lines.clear()
                 else:
+                    if is_pen_up:
+                        chunk_lines.append(pen_up_line)
                     chunk_lines.append(line)
+        chunk_lines.append("DONE")  # End all chunks
 
         all_lines = [line + "\n" for chunk in chunks for line in chunk]
         f.writelines(all_lines)
+
+
+def test_extract_contours(cv_image, new_dimensions):
+    # Convert the image to grayscale
+    img = cv2.cvtColor(cv_image, cv2.COLOR_RGB2GRAY)
+
+    # First rotation (make landscape) for optimal semicircle coverage
+    img = cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
+
+    # Resize image
+    img = cv2.resize(img, new_dimensions)
+
+    # This second rotation compensates for the screen Y coord corresponding to
+    # the arm's X coord. IMPORTANT!!!
+    img = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
+
+    edges = cv2.Canny(img, 100, 200)
+
+    # Convert edges to contours (each contour is an np.ndarray of points)
+    contours, _ = cv2.findContours(
+        edges,
+        cv2.RETR_TREE,
+        cv2.CHAIN_APPROX_SIMPLE
+    )
+    contours = [cnt.reshape(-1, 2) for cnt in contours]
+    return contours
 
 
 def extract_and_refine_contour_count(
@@ -218,18 +255,18 @@ def extract_and_refine_contour_count(
         detail_level_adaptation_step: float,
         min_contour_count: int,
         max_contour_count: int,
-        arm_max_length):
+        new_dimensions):
     """
     Iteratively adapt the contour detail and recalculate contours if the
     resultant contour count is too high or too low.
     """
 
-    detail_level = calculate_image_detail_level(cv_image, 1_000, 50_000)
+    detail_level = calculate_image_detail_level(cv_image, 100, 400)
 
-    while True:
+    for _ in range(10):  # Keep it reasonable
         contours = extract_contours(
             cv_image,
-            arm_max_length=arm_max_length,
+            new_dimensions=new_dimensions,
             initial_detail_level=detail_level
         )
         new_detail_level = detail_level
@@ -250,13 +287,14 @@ def extract_and_refine_contour_count(
         print(f"Number of countours is out of bounds: {len(contours)}.\n"
               f"Refining with new detail level: {detail_level:.2f}")
 
+    contours = np.array(contours, dtype=object)
     return contours
 
 
 def calculate_image_detail_level(
         cv_image,
         min_variance=0,
-        max_variance=50_000) -> float:
+        max_variance=1_000) -> float:
     """Get the detail level of a given image by calculating
     laplacian variance. Max ~50,000"""
     laplacian = cv2.Laplacian(cv_image, cv2.CV_64F)
@@ -425,6 +463,7 @@ def _get_smoothed_contours(
             smooth_contour = _dedupe_contour(smooth_contour)
             smoothed_contours.append(smooth_contour)
         else:
+            simplified_contour = _dedupe_contour(simplified_contour)
             smoothed_contours.append(simplified_contour)
 
     return smoothed_contours

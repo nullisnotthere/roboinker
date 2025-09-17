@@ -105,9 +105,15 @@ def get_real_angles(px, py, pz, base, arm1, arm2,
         return None
 
     ang_base, ang_arm1, ang_arm2 = ik_angles
+
+    # Minor corrections to y because IDFK
+    y = ang_base - 180
+    if y <= -180:
+        y = -(y + 360)
+
     return {
         "x": round(ang_arm2 - 180, decimals),
-        "y": round(ang_base - 180, decimals),
+        "y": round(y, decimals),
         "z": round(-ang_arm1 + 90, decimals),
         "a": round(ang_arm2 + ang_arm1 - 270, decimals)
     }

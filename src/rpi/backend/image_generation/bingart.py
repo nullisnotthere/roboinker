@@ -136,8 +136,12 @@ class BingArt:
         else:
             raise ValueError("content_type must be 'image' or 'video'")
 
+        print(creation_url)
+
         self.session.headers.update(headers)
         response = self.session.post(creation_url, data={'q': query, 'model': 'dalle'})
+
+        print(response.text)
 
         try:
             if content_type == 'image':

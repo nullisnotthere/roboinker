@@ -99,9 +99,9 @@ def _try_find_element(driver, *xpaths) -> WebElement | None:
         return None
 
 
-def _retrieve_new_cookie() -> str | None:
-    # Gets a new token from Microsoft by emulating a browser and
-    # reading the cookies. I checked TOS this is all good :)
+def retrieve_new_cookie() -> str | None:
+    """Gets a new token from Microsoft by emulating a browser and
+    reading the cookies. I checked TOS this is all good :)"""
     print("Getting new token cookie...")
 
     # Create fake user agent and add to Firefox profile
@@ -251,24 +251,24 @@ def get_token(generate_if_invalid=True) -> str | None:
         except JSONDecodeError:
             print("Could not decode JSON in token file.")
             if generate_if_invalid:
-                return _retrieve_new_cookie()
+                return retrieve_new_cookie()
 
         token = u_cookie.get("value")
         expiry_epoch = u_cookie.get("expiry")
 
         # If the JSON data is incomplete
         if (not (token and expiry_epoch)) and generate_if_invalid:
-            return _retrieve_new_cookie()
+            return retrieve_new_cookie()
 
         time_left = expiry_epoch - time.time()
 
         if generate_if_invalid:
             if time_left <= 0:
                 print("_U token expired!")
-                return _retrieve_new_cookie()
+                return retrieve_new_cookie()
             if not _check_token_is_valid(token):
                 print("_U token is invalid!")
-                return _retrieve_new_cookie()
+                return retrieve_new_cookie()
 
         formatted_time = time.strftime(
             "%d days %H hours %M mins %S sec",

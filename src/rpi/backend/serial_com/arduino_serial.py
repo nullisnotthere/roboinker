@@ -146,7 +146,7 @@ class ArduinoSerial:
 
     def request_angles(self) -> str | None:
         """Request the angle data from the Arduino."""
-        return self.send_data("READ ANGLES")
+        return self.send_data("*READ ANGLES")
 
     def print_response(self):
         """Prints last Arduino response."""
@@ -157,7 +157,6 @@ class ArduinoSerial:
                   data,
                   response_map: Mapping[str, Callable] | None = None
                   ) -> str | None:
-        return
         """
         Sends raw string MOTCTL formatted data to Arduino via serial.
         Pass a response map to handle certain responses from the Arduino.
@@ -184,7 +183,7 @@ class ArduinoSerial:
         z = deg_to_steps(angles_data["z"] * direction)
         a = deg_to_steps(angles_data["a"] * direction)
 
-        cmd = f"^@{x} {y} {z} {a}"
+        cmd = f"*@{x} {y} {z} {a}"
         print(f"sending angles cmd: {cmd}")
 
         self.send_data(cmd)

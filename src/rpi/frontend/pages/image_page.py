@@ -4,6 +4,7 @@ import os
 import pygame
 import pygame_gui
 import cv2
+import numpy as np
 import time
 
 from pygame import Rect, Surface
@@ -13,24 +14,17 @@ from src.rpi.frontend.pages.page import Page
 from src.rpi.backend.image_generation.image_generator import generate_images
 from src.rpi.backend.image_generation.bing_token_retriever import get_token
 from src.rpi.backend.image_processing import image_processing as img_proc
-from src.rpi.backend.constants import (DETAIL_LEVEL_ADAPT,
-                                       CONTOURS_COUNT_MIN,
-                                       CONTOURS_COUNT_MAX,
-                                       ANGLES_FILE_PATH,
-                                       ARM_LEN_1,
-                                       ARM_LEN_2,
-                                       BASE_HEIGHT,
-                                       PEN_ARM_LEN,
-                                       PEN_LEN,
-                                       BASE_SCREEN_OFFSET,
-                                       DRAG_ARM_HITBOX_SIZE)
-
-
-# Ensure API key environment variables exist
-BING_IMAGE_GEN_API_KEY = os.getenv("BING_IMAGE_GEN_API_KEY")
-if BING_IMAGE_GEN_API_KEY is None:
-    raise RuntimeError("Missing required environment variable: "
-                       "BING_IMAGE_GEN_API_KEY")
+from src.rpi.backend.constants import (
+    DETAIL_LEVEL_ADAPT,
+    CONTOURS_COUNT_MIN,
+    CONTOURS_COUNT_MAX,
+    ANGLES_FILE_PATH,
+    ARM_LEN_1,
+    ARM_LEN_2,
+    BASE_HEIGHT,
+    PEN_LEN,
+    PEN_UP_DISTANCE,
+)
 
 
 class ImagePage(Page):
@@ -71,7 +65,8 @@ class ImagePage(Page):
             container=self._main_frame,
             command=self._generate_contours
         )
-        self._gen_contours_button.disable()
+        # TODO: DISABLE ON START
+        #self._gen_contours_button.disable()
 
         self.test_image = pygame.image.load("images/panda.jpg") # TODO REMOVE
         self._image_preview = pygame_gui.elements.UIImage(
@@ -105,32 +100,43 @@ class ImagePage(Page):
         # Check that the extraction was successful
         current_image = self._images[self._image_preview_index]
 
+        # TODO REMOVE
+        #current_image = cv2.imread("images/harry.png")
+
+        img_width, img_height = 210, 210  # A4 paper width
+
         # Iteratively extract and refine contours from the image
         contours = img_proc.extract_and_refine_contour_count(
             current_image,
             DETAIL_LEVEL_ADAPT,
             CONTOURS_COUNT_MIN,
             CONTOURS_COUNT_MAX,
-            ARM_LEN_1 + ARM_LEN_2
+            (img_width, img_height)
         )
+        """
+        contours = img_proc.test_extract_contours(current_image,
+                                                  (img_width, img_height))
+        """
+
+        bg = np.zeros((210, 210, 3), dtype=np.uint8)
+
+        # Convert to CV2 Sequence[Matlike] to be able to draw
+        cv_contours = [np.array(contour, dtype=np.int32) for contour in contours]
+        cv2.drawContours(bg, cv_contours, -1, (255, 0, 0), 3)
+        cv2.imshow("Image", bg)
+        while True:
+            if cv2.waitKey(1) == ord('q'):
+                break
 
         # Sort the contours to reduce pen movement distances
-        contours = img_proc.sort_contours(contours)
-
-        # Calculate the image's optimal dimensions based on the arm's
-        # maximum arc
-        img_width, img_height = img_proc.calculate_image_new_dimen(
-            current_image, ARM_LEN_1 + ARM_LEN_2
-        )
-
-        print(f"NEW IMAGE DIMENSIONS WxH: {img_width}x{img_height}mm")
+        #contours = img_proc.sort_contours(contours)
 
         # Save the motor angles to a .motctl file
         img_proc.save_motor_angles(
             contours,
             BASE_HEIGHT, ARM_LEN_1, ARM_LEN_2,
             offset=(-320, -img_width // 2, PEN_LEN),  # xyz
-            pen_up_offset=PEN_LEN,
+            pen_up_offset=PEN_UP_DISTANCE,
             output_file=ANGLES_FILE_PATH
         )
 
