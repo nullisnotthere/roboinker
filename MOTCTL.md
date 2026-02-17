@@ -11,12 +11,12 @@ robotic arm accordingly.
 
 ## Syntax
 
-| Syntax   | Function                                            | Example               |
-|----------|-----------------------------------------------------|-----------------------|
-| @x y z a | Set the angles (in steps) for motors X, Y, Z, and A | @-1798 -280 853 -2651 |
-| &n       | Allocate n bytes of memory on the Arduino           | &9000                 |
-| ^        | Mark the start of a chunk of movement data          | ^                     |
-| $        | Mark the end of a chunk of movement data            | $                     |
+| Syntax     | Function                                            | Example                 |
+|------------|-----------------------------------------------------|-------------------------|
+| `@x y z a` | Set the angles (in steps) for motors X, Y, Z, and A | `@-1798 -280 853 -2651` |
+| `&n`       | Allocate n bytes of memory on the Arduino           | `&9000`                 |
+| `^`        | Mark the start of a chunk of movement data          | `^`                     |
+| `$`        | Mark the end of a chunk of movement data            | `$`                     |
 
 ### Example
 
