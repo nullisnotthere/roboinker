@@ -18,9 +18,10 @@
 
 </div>
 
->[!CAUTION]
+> [!CAUTION]
 > This project is old, unmaintained and very unfinished!
->Starting as a year-long project for Year 12 Systems Engineering, 
+>
+> Starting as a year-long project for Year 12 Systems Engineering, 
 roboinker has been dumped to this repo in its last working state (Sept, 2025). 
 It is highly unlikely that anything here works 
 (particularly without the hundreds of dollars worth of school-expensed materials), 
@@ -28,7 +29,7 @@ but feel free to take a peak regardless.
 
 ## Description
 
-Provides all of the software for a 3D-printed, 2-DOF robotic arm that draws images
+This project contains all of the software for a 3D-printed, 2-DOF robotic arm that draws images
 with a pen using AI and speech recognition. The repo provides a
 [visualiser](https://github.com/nullisnotthere/roboinker/blob/main/src/simulation/visualiser.py)
 script to demonstrate the backend processes in action.
