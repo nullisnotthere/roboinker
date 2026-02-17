@@ -18,6 +18,14 @@
 
 </div>
 
+>[!CAUTION]
+> This project is old, unmaintained and very unfinished!
+>Starting as a year-long project for Year 12 Systems Engineering, 
+roboinker has been dumped to this repo in its last working state (Sept, 2025). 
+It is highly unlikely that anything here works 
+(particularly without the hundreds of dollars worth of school-expensed materials), 
+but feel free to take a peak regardless.
+
 ## Description
 
 Provides all of the software for a 3D-printed, 2-DOF robotic arm that draws images
@@ -31,58 +39,47 @@ This is for my Year 12 Systems Engineering final project.
 
 ## Usage Guide
 
-This software requires a **Raspberry PI (5)** and **Arduino Uno** configured with
+This software runs on a **Raspberry PI (5)** and an **Arduino Uno** configured with a
 **CNC shield**
 and **DRV8825 stepper drivers**.
-However, the simulation code can be run on any machine given the correct
-configurations and required installs.
+However, the visualisation code can be run on any machine given the correct
+configurations and required dependencies.
 
-### Run the simulation code
+### Run the visualiser UI code
 
 ```bash
 git clone https://github.com/nullisnotthere/roboinker
 cd roboinker/
 pip install -r requirements.txt
-python src/simulation/visualiser.py
+python src/rpi/frontend/tft_ui.py
 ```
 
 ## Configuration
 
 This software depends on two (free) external AI web apps:
-[Deep AI](https://deepai.org/) and [Dream AI](https://dream.ai/create).
+[Deep AI](https://deepai.org/) for prompt processing and 
+[Microsoft's Bing AI](https://www.bing.com/images/create) for image generation.
 An account will need to be created for both of these websites to
 gain access to the required API keys and Authorization Tokens.
 
-`.env`
+A `.env` file should be configured for these services' respective
+API keys.
 
 ```env
-# Sensitive environment variables for Dream AI
-DREAM_AI_EMAIL='Your Dream AI email'
-DREAM_AI_PASSWORD='Your Dream AI password'
-DREAM_AI_API_KEY='Your Dream AI API key'
-
-# Do not configure. This will automatically be retrieved.
-DREAM_AI_AUTH_TOKEN='null'
-
-
 # Sensitive environment variables for Deep AI
 DEEP_AI_API_KEY='Your Deep AI API key'
+
+# Sensitive environment variables for Bing
+BING_EMAIL='Your Bing email'
+BING_USERNAME='Your Bing username'
+BING_PASSWORD='Your Bing password'
 ```
-
-### How to get Dream AI API Key
-
-1. [Sign Up to Dream AI](https://dream.ai/profile)
-2. Ctrl+Shift+I and navigate to `Storage` tab
-3. Navigate to `IndexedDB`/`https://dream.ai`/`firebaseLocalStorageDb (default)`/`firebaseLocalStorage`
-4. Click the `firebase:authUser` entry
-5. On the right navigate to `value`/`apiKey` and (right-click) copy the value
-6. Use this as the `DREAM_AI_API_KEY` value in `.env`
 
 ### How to get Deep AI API Key
 
 1. [Sign up to Deep AI](https://deepai.org/)
 2. Navigate to [your dashboard](https://deepai.org/dashboard/profile)
-3. Copy your API key
+3. Copy your API key to `.env`
 
 ## Code Flow
 
