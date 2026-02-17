@@ -19,9 +19,9 @@
 </div>
 
 > [!CAUTION]
-> This project is old, unmaintained and very unfinished!
+> **This project is old, unmaintained and very unfinished!**
 >
-> Starting as a year-long project for Year 12 Systems Engineering, 
+> Starting as a year-long final project for Year 12 Systems Engineering, 
 roboinker has been dumped to this repo in its last working state (Sept, 2025). 
 It is highly unlikely that anything here works 
 (particularly without the hundreds of dollars worth of school-expensed materials), 
@@ -33,8 +33,6 @@ This project contains all of the software for a 3D-printed, 2-DOF robotic arm th
 with a pen using AI and speech recognition. The repo provides a
 [visualiser](https://github.com/nullisnotthere/roboinker/blob/main/src/simulation/visualiser.py)
 script to demonstrate the backend processes in action.
-
-This is for my Year 12 Systems Engineering final project.
 
 <img src="images/arm_model.png" alt="3D model of the finished robotic arm in Blender" width="600">
 
@@ -97,3 +95,8 @@ BING_PASSWORD='Your Bing password'
    [.motctl documentation](https://github.com/nullisnotthere/roboinker/blob/main/MOTCTL.md)
 6. Visualise the robotic arm's drawing process using
    [inverse kinematics](https://github.com/nullisnotthere/roboinker/tree/main/src/rpi/backend/ik)
+
+## References
+
+- https://github.com/DedInc/bingart
+- https://github.com/5eroo/DeepAI-Wrapper
