@@ -100,6 +100,8 @@ BING_PASSWORD='Your Bing password'
    [inverse kinematics](https://github.com/nullisnotthere/roboinker/tree/main/src/rpi/backend/ik)
 
 ## References
-
-- https://github.com/DedInc/bingart
-- https://github.com/5eroo/DeepAI-Wrapper
+ 
+- [Bing AI image generation wrapper](https://github.com/DedInc/bingart)
+- [Deep AI API wrapper](https://github.com/5eroo/DeepAI-Wrapper)
+- [Inverse Kinematics](https://github.com/vishwas1101/Inverse-Kinematic-Robot-Arm/blob/
+        master/InverseKinematics/IK_Simulation.py)
