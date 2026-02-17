@@ -6,22 +6,29 @@ Documentation for `.motctl` file format used in this project.
 
 The instructions within `data/output.motctl` are read from by the Raspberry PI
 and sent via a serial connection to the Arduino Uno. The Arduino reads and
-parses the instructions, extracting values and moving the motors on the
+parses the instructions chunk by chunk, extracting values and moving the motors on the
 robotic arm accordingly.
 
 ## Syntax
 
-`COMMAND$AXISNAME:VALUE,AXISNAME2:VALUE,AXISNAME3:VALUE,AXISNAME4:VALUE`
+| Syntax   | Function                                            | Example               |
+|----------|-----------------------------------------------------|-----------------------|
+| @x y z a | Set the angles (in steps) for motors X, Y, Z, and A | @-1798 -280 853 -2651 |
+| &n       | Allocate n bytes of memory on the Arduino           | &9000                 |
+| ^        | Mark the start of a chunk of movement data          | ^                     |
+| $        | Mark the end of a chunk of movement data            | $                     |
 
 ### Example
 
-`SET ANGLES$x:45.00,y:60.00,z:-30.00,a:90.00`
-`SET SPEEDS$x:50,y:-100,z:0,a:0`
-
-## Commands
-
-- `SET ANGLES`: Specify target angles for the arm to move to
-- `SET SPEEDS`: Specify speeds for each of the arm's motors
-- `PEN UP`: Mark pen as up
-- `PEN DOWN`: Mark pen as down
-- `NO ANGLES`: No angles provided, skip (useful for debugging)
+```motctl
+&1024
+^
+@-1798 -280 853 -2651
+@-1798 -280 853 -2651
+$
+&512
+^
+@-1795 -290 853 -2648
+@-1768 -313 859 -2627
+$
+```
