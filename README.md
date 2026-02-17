@@ -53,7 +53,7 @@ configurations and required dependencies.
 git clone https://github.com/nullisnotthere/roboinker
 cd roboinker/
 pip install -r requirements.txt
-python src/rpi/frontend/tft_ui.py
+python -m src.rpi.frontend.tft_ui
 ```
 
 ## Configuration
