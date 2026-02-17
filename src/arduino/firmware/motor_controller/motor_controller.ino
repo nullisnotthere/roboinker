@@ -1,7 +1,6 @@
 #include <math.h>
 #include <AccelStepper.h>
 
-// Pin Definitions
 #define DIR_PIN_X 5
 #define STEP_PIN_X 2
 #define DIR_PIN_Y 6
@@ -11,18 +10,15 @@
 #define DIR_PIN_A 13
 #define STEP_PIN_A 12
 
-// Motion Parameters
 const int STEPS_PER_REV = 200;
 const int MAX_SPEED = 100;
 const int ACCEL = 3000;
 const float DEG_PER_STEP = 1.8f;
 const float GEAR_RATIO = 256.0f / 9.0f;
 
-// Movement Flags
 const bool ENABLE_RELATIVE_MOVE = false;
 bool xReached = false, yReached = false, zReached = false, aReached = false;
 
-// Stepper Motors
 AccelStepper stepperX(AccelStepper::DRIVER, STEP_PIN_X, DIR_PIN_X);
 AccelStepper stepperY(AccelStepper::DRIVER, STEP_PIN_Y, DIR_PIN_Y);
 AccelStepper stepperZ(AccelStepper::DRIVER, STEP_PIN_Z, DIR_PIN_Z);
@@ -226,14 +222,13 @@ void handleSerial() {
     while (Serial.available() > 0) {
         char c = (char)Serial.read();
 
-        // Mode 1: inside a ^...$ chunk
+        // inside a ^...$ chunk
         if (writingChunk) {
             if (chunkAllocated && chunkBuffer != nullptr && chunkBufferSize > 0) {
                 if (chunkBufferUsed < (chunkBufferSize - 1)) {
                     chunkBuffer[chunkBufferUsed++] = c;   // store every byte (incl. newlines, '$')
                     chunkBuffer[chunkBufferUsed] = '\0';  // keep null-terminated
                 }
-                // else: drop overflow but keep scanning until '$'
             }
             if (c == '$') {
                 writingChunk = false;
@@ -244,7 +239,7 @@ void handleSerial() {
             continue; // do not treat chunk bytes as command lines
         }
 
-        // Not inside chunk yet: check for '^' to start
+        // Not inside chunk yet, check for '^' to start
         if (c == '^') {
             writingChunk = true;
             if (chunkAllocated && chunkBuffer != nullptr && chunkBufferSize > 0) {
@@ -280,7 +275,6 @@ void handleSerial() {
         if (lineLen < (int)sizeof(lineBuf) - 1) {
             lineBuf[lineLen++] = c;
         }
-        // else: truncate until EOL to remain safe and non-blocking
     }
 }
 
@@ -294,7 +288,7 @@ void parseCurrentChunk() {
         // Allocate 128B temporary buffer for this line
         char* tmp = (char*)malloc(128);
         if (!tmp) {
-            // Allocation failed — abort parsing to avoid UB
+            // Allocation failed, abort parsing to avoid UB
             return;
         }
         int idx = 0;
