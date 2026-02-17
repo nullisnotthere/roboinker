@@ -60,8 +60,8 @@ python src/rpi/frontend/tft_ui.py
 
 This software depends on two (free) external AI web apps:
 
-1. [Deep AI](https://deepai.org/) for prompt processing.
-[2. Microsoft's Bing AI](https://www.bing.com/images/create) for image generation.
+1. [Groq](https://chat.groq.com/) for prompt processing.
+2. [Microsoft's Bing AI](https://www.bing.com/images/create) for image generation.
 
 An account will need to be created for both of these services to
 gain access to the required API keys and Authorization Tokens.
@@ -70,20 +70,14 @@ A `.env` file should be configured for each service's
 authentication keys.
 
 ```env
-# Sensitive environment variables for Deep AI
-DEEP_AI_API_KEY='Your Deep AI API key'
+# Sensitive environment variables for Groq
+GROQ_AI_API_KEY='Your Groq AI API key'
 
 # Sensitive environment variables for Bing
 BING_EMAIL='Your Bing email'
 BING_USERNAME='Your Bing username'
 BING_PASSWORD='Your Bing password'
 ```
-
-### How to get Deep AI API Key
-
-1. [Sign up to Deep AI](https://deepai.org/)
-2. Navigate to [your dashboard](https://deepai.org/dashboard/profile)
-3. Copy your API key to `.env`
 
 ## Code Flow
 
@@ -104,5 +98,5 @@ BING_PASSWORD='Your Bing password'
 ## References
  
 - [Bing AI image generation wrapper](https://github.com/DedInc/bingart)
-- [Deep AI API wrapper](https://github.com/5eroo/DeepAI-Wrapper)
+- ~~[Deep AI API wrapper](https://github.com/5eroo/DeepAI-Wrapper)~~
 - [Inverse Kinematics](https://github.com/vishwas1101/Inverse-Kinematic-Robot-Arm/blob/master/InverseKinematics/IK_Simulation.py)
