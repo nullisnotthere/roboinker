@@ -31,8 +31,8 @@ but feel free to take a peak regardless.
 
 This project contains all of the software for a 3D-printed, 2-DOF robotic arm that draws images
 with a pen using AI and speech recognition. The repo provides a
-[visualiser](https://github.com/nullisnotthere/roboinker/blob/main/src/simulation/visualiser.py)
-script to demonstrate the backend processes in action.
+[GUI](https://github.com/nullisnotthere/roboinker/blob/main/src/rpi/frontend/tft_ui.py) 
+to demonstrate the backend processes in action.
 
 <img src="images/arm_model.png" alt="3D model of the finished robotic arm in Blender" width="600">
 
