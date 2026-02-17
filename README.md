@@ -26,6 +26,9 @@ roboinker has been dumped to this repo in its last working state (Sept, 2025).
 It is highly unlikely that anything here works 
 (particularly without the hundreds of dollars worth of school-expensed materials), 
 but feel free to take a peak regardless.
+>
+> Additionally, a ~100 page report was produced algonside this project. 
+Big thanks to 'teach for being chill and letting it slide till the last week ✌️
 
 ## Description
 
