@@ -59,13 +59,15 @@ python src/rpi/frontend/tft_ui.py
 ## Configuration
 
 This software depends on two (free) external AI web apps:
-[Deep AI](https://deepai.org/) for prompt processing and 
-[Microsoft's Bing AI](https://www.bing.com/images/create) for image generation.
-An account will need to be created for both of these websites to
+
+1. [Deep AI](https://deepai.org/) for prompt processing.
+[2. Microsoft's Bing AI](https://www.bing.com/images/create) for image generation.
+
+An account will need to be created for both of these services to
 gain access to the required API keys and Authorization Tokens.
 
-A `.env` file should be configured for these services' respective
-API keys.
+A `.env` file should be configured for each service's
+authentication keys.
 
 ```env
 # Sensitive environment variables for Deep AI
